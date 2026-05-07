@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: race_postgres
+    environment:
+      POSTGRES_DB: race_emotion
+      POSTGRES_USER: race_user
+      POSTGRES_PASSWORD: race_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U race_user -d race_emotion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - race_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: race_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - race_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: race_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - race_network
+
+  core-api:
+    build:
+      context: ../../services/core-api
+      dockerfile: ../../infra/docker/Dockerfile.core-api
+    container_name: race_core_api
+    environment:
+      DATABASE_URL: postgres://race_user:race_password@postgres:5432/race_emotion
+      REDIS_URL: redis://redis:6379
+      AI_ENGINE_URL: http://ai-engine:8090
+      RUST_LOG: info
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - race_network
+
+  ai-engine:
+    build:
+      context: ../../services/ai-engine
+      dockerfile: ../../infra/docker/Dockerfile.ai-engine
+    container_name: race_ai_engine
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: rules
+      AI_ENGINE_HOST: 0.0.0.0
+      AI_ENGINE_PORT: 8090
+    ports:
+      - "8090:8090"
+    networks:
+      - race_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  race_network:
+    driver: bridge
