@@ -14,68 +14,90 @@ struct EmotionReportPage {
 
   build() {
     Column() {
+      // Header
       Row() {
         Text('<')
-          .fontSize(20)
+          .fontSize(22)
           .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
           .margin({ left: 15 })
           .onClick(() => router.back())
 
         Text('情绪报告')
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
+          .fontColor('#333333')
           .margin({ left: 10 })
 
         Blank()
 
         Button('刷新')
-          .fontSize(14)
+          .fontSize(13)
           .backgroundColor('#4A90D9')
-          .borderRadius(15)
-          .height(32)
+          .borderRadius(14)
+          .height(28)
           .margin({ right: 15 })
           .onClick(() => this.loadReport())
       }
       .width('100%')
-      .height(50)
+      .height(56)
       .backgroundColor('#FFFFFF')
+      .shadow({
+        radius: 4,
+        color: 'rgba(0,0,0,0.05)',
+        offsetY: 2
+      })
 
       if (this.isLoading) {
         Column() {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .color('#4A90D9')
           Text('加载中...')
-            .fontSize(16)
-            .fontColor('#666666')
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ top: 12 })
         }
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
+        .backgroundColor('#F8F9FA')
       } else if (this.report) {
         Scroll() {
           Column() {
             this.SummaryCard()
-
             this.EmotionDistributionCard()
-
             this.RecentRecordsCard()
           }
           .padding(15)
         }
         .width('100%')
         .layoutWeight(1)
-        .backgroundColor('#F5F5F5')
+        .backgroundColor('#F8F9FA')
       } else {
         Column() {
-          Text('暂无报告数据')
-            .fontSize(16)
-            .fontColor('#666666')
-
-          Button('创建匿名用户')
-            .margin({ top: 20 })
-            .onClick(() => this.initUser())
+          Column() {
+            Text('📊')
+              .fontSize(60)
+              .margin({ top: 60 })
+            Text('暂无报告数据')
+              .fontSize(16)
+              .fontColor('#666666')
+              .margin({ top: 15 })
+            Button('创建匿名用户')
+              .width(160)
+              .height(44)
+              .backgroundColor('#4A90D9')
+              .borderRadius(22)
+              .fontColor('#FFFFFF')
+              .margin({ top: 25 })
+              .onClick(() => this.initUser())
+          }
+          .layoutWeight(1)
         }
         .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        .backgroundColor('#F8F9FA')
       }
     }
     .width('100%')
@@ -87,49 +109,70 @@ struct EmotionReportPage {
   SummaryCard() {
     Column() {
       Text('本周情绪概况')
-        .fontSize(18)
+        .fontSize(17)
         .fontWeight(FontWeight.Bold)
+        .fontColor('#333333')
+        .alignSelf(ItemAlign.Start)
 
       Row() {
         Column() {
+          Text(this.getEmotionEmoji(this.report?.dominant_emotion || 'neutral'))
+            .fontSize(32)
           Text(this.report?.dominant_emotion || 'neutral')
-            .fontSize(24)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor('#4A90D9')
+            .margin({ top: 6 })
           Text('主要情绪')
             .fontSize(12)
-            .fontColor('#666666')
+            .fontColor('#999999')
+            .margin({ top: 4 })
         }
         .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+        .padding({ top: 16, bottom: 16 })
 
         Column() {
           Text((this.report?.average_intensity || 0).toFixed(2))
-            .fontSize(24)
+            .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FF9500')
           Text('平均强度')
             .fontSize(12)
-            .fontColor('#666666')
+            .fontColor('#999999')
+            .margin({ top: 4 })
         }
         .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+        .padding({ top: 16, bottom: 16 })
 
         Column() {
           Text((this.report?.total_records || 0).toString())
-            .fontSize(24)
+            .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor('#4CAF50')
           Text('记录数')
             .fontSize(12)
-            .fontColor('#666666')
+            .fontColor('#999999')
+            .margin({ top: 4 })
         }
         .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+        .padding({ top: 16, bottom: 16 })
       }
-      .margin({ top: 20 })
+      .width('100%')
+      .margin({ top: 12 })
     }
     .width('100%')
-    .padding(20)
+    .padding(18)
     .backgroundColor('#FFFFFF')
-    .borderRadius(15)
+    .borderRadius(16)
+    .shadow({
+      radius: 10,
+      color: 'rgba(0,0,0,0.06)',
+      offsetX: 0,
+      offsetY: 3
+    })
     .margin({ bottom: 15 })
   }
 
@@ -139,35 +182,68 @@ struct EmotionReportPage {
       Text('情绪分布')
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
+        .fontColor('#333333')
         .alignSelf(ItemAlign.Start)
-        .margin({ bottom: 15 })
 
-      if (this.report?.emotion_distribution) {
-        ForEach(this.report?.emotion_distribution || [], (item: { emotion: string, count: number }) => {
-          Row() {
-            Text(this.getEmotionEmoji(item.emotion))
-              .fontSize(16)
-            Text(item.emotion)
-              .fontSize(14)
-              .margin({ left: 8 })
-            Blank()
-            Text(item.count.toString())
-              .fontSize(14)
-              .fontColor('#4A90D9')
-          }
-          .width('100%')
-          .padding({ top: 8, bottom: 8 })
-        })
+      if (this.report?.emotion_distribution && this.report.emotion_distribution.length > 0) {
+        Column() {
+          ForEach(this.report?.emotion_distribution || [], (item: { emotion: string, count: number }) => {
+            Row() {
+              Text(this.getEmotionEmoji(item.emotion))
+                .fontSize(18)
+                .width(32)
+
+              Text(item.emotion)
+                .fontSize(14)
+                .fontColor('#666666')
+                .width(60)
+
+              Column() {
+                Row() {
+                  Rectangle()
+                    .width(Math.max(20, (item.count / (this.report?.total_records || 1)) * 180))
+                    .height(8)
+                    .fill(this.getEmotionColor(item.emotion))
+                    .borderRadius(4)
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.Start)
+              }
+              .layoutWeight(1)
+              .margin({ left: 10, right: 10 })
+
+              Text(item.count.toString())
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#333333')
+                .width(30)
+              Text('次')
+                .fontSize(12)
+                .fontColor('#999999')
+            }
+            .width('100%')
+            .padding({ top: 10, bottom: 10 })
+          })
+        }
+        .width('100%')
+        .margin({ top: 14 })
       } else {
         Text('暂无数据')
           .fontSize(14)
-          .fontColor('#999999')
+          .fontColor('#CCCCCC')
+          .margin({ top: 16, bottom: 16 })
       }
     }
     .width('100%')
-    .padding(20)
+    .padding(18)
     .backgroundColor('#FFFFFF')
-    .borderRadius(15)
+    .borderRadius(16)
+    .shadow({
+      radius: 10,
+      color: 'rgba(0,0,0,0.06)',
+      offsetX: 0,
+      offsetY: 3
+    })
     .margin({ bottom: 15 })
   }
 
@@ -177,43 +253,62 @@ struct EmotionReportPage {
       Text('最近记录')
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
+        .fontColor('#333333')
         .alignSelf(ItemAlign.Start)
-        .margin({ bottom: 15 })
+        .margin({ bottom: 12 })
 
       if (this.report?.recent_records && this.report.recent_records.length > 0) {
-        ForEach(this.report.recent_records.slice(0, 5), (record: any) => {
+        ForEach(this.report.recent_records.slice(0, 5), (record: any, index: number) => {
           Row() {
             Text(this.getEmotionEmoji(record.emotion))
-              .fontSize(16)
+              .fontSize(22)
+              .width(40)
+
             Column() {
               Text(record.emotion)
                 .fontSize(14)
                 .fontColor('#333333')
+                .fontWeight(FontWeight.Medium)
               Text(record.created_at.split('T')[0])
                 .fontSize(12)
                 .fontColor('#999999')
+                .margin({ top: 2 })
             }
-            .margin({ left: 8 })
             .alignItems(HorizontalAlign.Start)
-            Blank()
+            .layoutWeight(1)
+
             if (record.risk_detected) {
               Text('⚠️')
-                .fontSize(16)
+                .fontSize(18)
+                .backgroundColor('#FFF3E0')
+                .padding(6)
+                .borderRadius(8)
             }
           }
           .width('100%')
-          .padding({ top: 8, bottom: 8 })
+          .padding({ top: 10, bottom: 10 })
+          .border({
+            width: { bottom: index < Math.min(this.report.recent_records.length, 5) - 1 ? 1 : 0 },
+            color: '#F5F5F5'
+          })
         })
       } else {
         Text('暂无记录')
           .fontSize(14)
-          .fontColor('#999999')
+          .fontColor('#CCCCCC')
+          .padding({ top: 16, bottom: 16 })
       }
     }
     .width('100%')
-    .padding(20)
+    .padding(18)
     .backgroundColor('#FFFFFF')
-    .borderRadius(15)
+    .borderRadius(16)
+    .shadow({
+      radius: 10,
+      color: 'rgba(0,0,0,0.06)',
+      offsetX: 0,
+      offsetY: 3
+    })
     .margin({ bottom: 15 })
   }
 
@@ -241,13 +336,17 @@ struct EmotionReportPage {
 
   getEmotionEmoji(emotion: string): string {
     let emojiMap: Record<string, string> = {
-      'happy': '😊',
-      'sad': '😢',
-      'angry': '😠',
-      'anxious': '😰',
-      'lonely': '😔',
-      'neutral': '😐'
+      'happy': '😊', 'sad': '😢', 'angry': '😠',
+      'anxious': '😰', 'lonely': '😔', 'neutral': '😐'
     };
     return emojiMap[emotion] || '😐';
+  }
+
+  getEmotionColor(emotion: string): string {
+    let colorMap: Record<string, string> = {
+      'happy': '#4CAF50', 'sad': '#2196F3', 'angry': '#F44336',
+      'anxious': '#FF9800', 'lonely': '#9C27B0', 'neutral': '#9E9E9E'
+    };
+    return colorMap[emotion] || '#9E9E9E';
   }
 }

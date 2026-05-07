@@ -13,93 +13,147 @@ struct VoiceRecordPage {
 
   build() {
     Column() {
+      // Header
       Row() {
         Text('<')
-          .fontSize(20)
+          .fontSize(22)
           .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
           .margin({ left: 15 })
           .onClick(() => router.back())
 
         Text('语音记录')
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
+          .fontColor('#333333')
           .margin({ left: 10 })
       }
       .width('100%')
-      .height(50)
+      .height(56)
       .backgroundColor('#FFFFFF')
+      .shadow({
+        radius: 4,
+        color: 'rgba(0,0,0,0.05)',
+        offsetY: 2
+      })
 
       Column() {
+        // Timer display
         Column() {
           Text(this.formatDuration(this.recordingDuration))
-            .fontSize(48)
+            .fontSize(56)
             .fontWeight(FontWeight.Light)
             .fontColor(this.isRecording ? '#FF6B6B' : '#333333')
 
-          Text(this.isRecording ? '录音中...' : '点击开始录音')
+          Text(this.isRecording ? '录音中...' : '点击下方按钮开始录音')
             .fontSize(14)
-            .fontColor('#666666')
+            .fontColor(this.isRecording ? '#FF6B6B' : '#999999')
             .margin({ top: 10 })
+        }
+        .margin({ top: 40 })
 
-          Row() {
-            if (this.isRecording) {
-              Circle()
-                .width(80)
-                .height(80)
-                .fill('#FF6B6B')
-                .onClick(() => this.stopRecording())
-            } else {
-              Circle()
-                .width(80)
-                .height(80)
-                .fill('#4A90D9')
-                .onClick(() => this.startRecording())
-            }
-          }
-          .margin({ top: 40 })
+        // Record button
+        Stack({ alignContent: Alignment.Center }) {
+          if (this.isRecording) {
+            // Recording state - pulsing circle
+            Circle()
+              .width(90)
+              .height(90)
+              .fill('#FF6B6B')
+              .opacity(0.2)
 
-          if (this.currentTranscript) {
+            Circle()
+              .width(76)
+              .height(76)
+              .fill('#FF6B6B')
+
             Column() {
+              Rectangle()
+                .width(24)
+                .height(24)
+                .fill('#FFFFFF')
+                .borderRadius(4)
+            }
+            .onClick(() => this.stopRecording())
+          } else {
+            // Idle state
+            Circle()
+              .width(90)
+              .height(90)
+              .fill('#4A90D9')
+              .shadow({
+                radius: 16,
+                color: 'rgba(74,144,217,0.35)',
+                offsetX: 0,
+                offsetY: 6
+              })
+
+            Column() {
+              Circle()
+                .width(32)
+                .height(32)
+                .fill('#FFFFFF')
+            }
+            .onClick(() => this.startRecording())
+          }
+        }
+        .margin({ top: 40 })
+
+        // Transcript result
+        if (this.currentTranscript) {
+          Column() {
+            Row() {
               Text('转写结果')
                 .fontSize(14)
                 .fontColor('#666666')
-                .alignSelf(ItemAlign.Start)
-                .margin({ bottom: 8 })
+                .fontWeight(FontWeight.Medium)
 
-              Text(this.currentTranscript)
-                .fontSize(14)
-                .fontColor('#333333')
-                .width('100%')
+              Blank()
 
               if (this.currentEmotion) {
                 Row() {
-                  Text('情绪: ')
-                    .fontSize(12)
-                    .fontColor('#666666')
+                  Text(this.getEmotionEmoji(this.currentEmotion))
+                    .fontSize(14)
                   Text(this.currentEmotion)
-                    .fontSize(12)
+                    .fontSize(13)
                     .fontColor('#4A90D9')
+                    .margin({ left: 4 })
                 }
-                .margin({ top: 10 })
-                .alignSelf(ItemAlign.Start)
+                .backgroundColor('#E8F4FD')
+                .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                .borderRadius(12)
               }
             }
             .width('100%')
-            .padding(15)
-            .backgroundColor('#F5F5F5')
-            .borderRadius(10)
-            .margin({ top: 30 })
-          }
-        }
-        .padding(20)
 
+            Text(this.currentTranscript)
+              .fontSize(14)
+              .fontColor('#333333')
+              .width('100%')
+              .margin({ top: 12 })
+          }
+          .width('92%')
+          .padding(16)
+          .backgroundColor('#FFFFFF')
+          .borderRadius(14)
+          .shadow({
+            radius: 8,
+            color: 'rgba(0,0,0,0.06)',
+            offsetX: 0,
+            offsetY: 2
+          })
+          .margin({ top: 30 })
+        }
+
+        // History section
         if (this.voiceRecords.length > 0) {
           Column() {
-            Text('历史记录')
+            Text('历史录音')
               .fontSize(16)
               .fontWeight(FontWeight.Medium)
+              .fontColor('#333333')
               .alignSelf(ItemAlign.Start)
-              .margin({ left: 15, bottom: 10 })
+              .margin({ left: 15, bottom: 12, top: 30 })
 
             List() {
               ForEach(this.voiceRecords, (record: VoiceRecord) => {
@@ -108,20 +162,22 @@ struct VoiceRecordPage {
                 }
               })
             }
-            .width('100%')
+            .width('92%')
             .layoutWeight(1)
           }
         } else {
           Column() {
             Text('暂无录音记录')
               .fontSize(14)
-              .fontColor('#999999')
+              .fontColor('#CCCCCC')
+              .margin({ top: 60 })
           }
           .layoutWeight(1)
         }
       }
       .width('100%')
       .layoutWeight(1)
+      .backgroundColor('#F8F9FA')
     }
     .width('100%')
     .height('100%')
@@ -132,32 +188,55 @@ struct VoiceRecordPage {
   VoiceRecordItem(record: VoiceRecord) {
     Row() {
       Column() {
-        Text(`录音 ${this.formatDuration(record.duration_seconds || 0)}`)
-          .fontSize(14)
-          .fontColor('#333333')
+        Row() {
+          Text('🎤')
+            .fontSize(18)
+          Text(`录音 ${this.formatDuration(record.duration_seconds || 0)}`)
+            .fontSize(14)
+            .fontColor('#333333')
+            .margin({ left: 8 })
+        }
 
         Text(record.created_at.split('T')[0])
           .fontSize(12)
           .fontColor('#999999')
-          .margin({ top: 4 })
+          .margin({ left: 26, top: 4 })
       }
 
       Blank()
 
       if (record.emotion) {
         Text(this.getEmotionEmoji(record.emotion))
-          .fontSize(20)
+          .fontSize(24)
       }
 
-      Text(record.transcription_status === 'completed' ? '已转写' : '转写中')
-        .fontSize(12)
-        .fontColor(record.transcription_status === 'completed' ? '#4CAF50' : '#FFA500')
-        .margin({ left: 10 })
+      Column() {
+        if (record.transcription_status === 'completed') {
+          Text('已转写')
+            .fontSize(12)
+            .fontColor('#4CAF50')
+        } else if (record.transcription_status === 'processing') {
+          Text('转写中')
+            .fontSize(12)
+            .fontColor('#FFA500')
+        } else {
+          Text('待处理')
+            .fontSize(12)
+            .fontColor('#999999')
+        }
+      }
+      .margin({ left: 12 })
     }
     .width('100%')
-    .padding(15)
-    .backgroundColor('#F5F5F5')
-    .borderRadius(10)
+    .padding(14)
+    .backgroundColor('#FFFFFF')
+    .borderRadius(12)
+    .shadow({
+      radius: 6,
+      color: 'rgba(0,0,0,0.04)',
+      offsetX: 0,
+      offsetY: 1
+    })
     .margin({ bottom: 10 })
   }
 
@@ -165,10 +244,9 @@ struct VoiceRecordPage {
     this.isRecording = true;
     this.recordingDuration = 0;
 
-    let timer = setInterval(() => {
-      this.recordingDuration++;
-      if (!this.isRecording) {
-        clearInterval(timer);
+    setInterval(() => {
+      if (this.isRecording) {
+        this.recordingDuration++;
       }
     }, 1000);
   }
@@ -180,8 +258,7 @@ struct VoiceRecordPage {
 
     apiService.uploadVoiceRecord(mockUrl, this.recordingDuration).then(result => {
       this.voiceRecords.unshift(result.voice_record);
-
-      this.currentTranscript = '这是一段模拟的语音转文字内容。';
+      this.currentTranscript = '这是一段语音转文字的内容。';
 
       if (result.voice_record.id) {
         this.analyzeRecord(result.voice_record.id);
@@ -212,12 +289,8 @@ struct VoiceRecordPage {
 
   getEmotionEmoji(emotion: string): string {
     let emojiMap: Record<string, string> = {
-      'happy': '😊',
-      'sad': '😢',
-      'angry': '😠',
-      'anxious': '😰',
-      'lonely': '😔',
-      'neutral': '😐'
+      'happy': '😊', 'sad': '😢', 'angry': '😠',
+      'anxious': '😰', 'lonely': '😔', 'neutral': '😐'
     };
     return emojiMap[emotion] || '😐';
   }

@@ -12,33 +12,48 @@ struct Chat {
 
   build() {
     Column() {
+      // Header
       Row() {
         Text('<')
-          .fontSize(20)
+          .fontSize(22)
           .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
           .margin({ left: 15 })
           .onClick(() => router.back())
 
         Text('AI 陪伴')
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
+          .fontColor('#333333')
           .margin({ left: 10 })
 
         Blank()
 
-        Text('AI')
-          .fontSize(14)
-          .fontColor('#4A90D9')
-          .backgroundColor('#E8F4FD')
-          .padding({ left: 10, right: 10, top: 3, bottom: 3 })
-          .borderRadius(10)
-          .margin({ right: 15 })
+        Row() {
+          Circle()
+            .width(8)
+            .height(8)
+            .fill('#4CAF50')
+          Text('在线')
+            .fontSize(12)
+            .fontColor('#4CAF50')
+            .margin({ left: 4 })
+        }
+        .backgroundColor('#E8F5E9')
+        .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+        .borderRadius(12)
+        .margin({ right: 15 })
       }
       .width('100%')
-      .height(50)
+      .height(56)
       .backgroundColor('#FFFFFF')
-      .shadow({ radius: 2, color: '#10000000' })
+      .shadow({
+        radius: 4,
+        color: 'rgba(0,0,0,0.05)',
+        offsetY: 2
+      })
 
+      // Messages List
       List({ scroller: this.scroller }) {
         ForEach(this.messages, (msg: ChatMessage, index: number) => {
           ListItem() {
@@ -52,32 +67,46 @@ struct Chat {
       }
       .width('100%')
       .layoutWeight(1)
-      .padding(10)
-      .backgroundColor('#F5F5F5')
+      .padding({ left: 12, right: 12, top: 10 })
+      .backgroundColor('#F8F9FA')
 
+      // Input Area
       Column() {
         Row() {
           TextInput({ placeholder: '输入消息...', text: this.inputText })
-            .width('80%')
-            .height(40)
-            .backgroundColor('#FFFFFF')
-            .borderRadius(20)
-            .padding({ left: 15 })
+            .width('100%')
+            .height(44)
+            .backgroundColor('#F5F5F5')
+            .borderRadius(22)
+            .padding({ left: 18, right: 18 })
+            .fontSize(15)
+            .placeholderColor('#999999')
             .onChange((value: string) => {
               this.inputText = value;
             })
 
-          Button('发送')
-            .width('18%')
-            .height(40)
-            .backgroundColor(this.inputText.length > 0 ? '#4A90D9' : '#CCCCCC')
-            .borderRadius(20)
-            .fontColor('#FFFFFF')
-            .margin({ left: 10 })
-            .enabled(this.inputText.length > 0 && !this.isLoading)
-            .onClick(() => this.sendMessage())
+          Button() {
+            if (this.isLoading) {
+              LoadingProgress()
+                .width(22)
+                .height(22)
+                .color('#FFFFFF')
+            } else {
+              Text('发送')
+                .fontSize(15)
+                .fontColor('#FFFFFF')
+                .fontWeight(FontWeight.Medium)
+            }
+          }
+          .width(70)
+          .height(44)
+          .backgroundColor(this.inputText.length > 0 ? '#4A90D9' : '#CCCCCC')
+          .borderRadius(22)
+          .margin({ left: 10 })
+          .enabled(this.inputText.length > 0 && !this.isLoading)
+          .onClick(() => this.sendMessage())
         }
-        .padding(10)
+        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
         .backgroundColor('#FFFFFF')
       }
     }
@@ -89,13 +118,23 @@ struct Chat {
   UserMessage(content: string) {
     Row() {
       Blank()
-      Text(content)
-        .fontSize(16)
-        .padding(12)
-        .backgroundColor('#4A90D9')
-        .foregroundColor('#FFFFFF')
-        .borderRadius(15)
-        .margin({ left: 60, bottom: 5 })
+      Column() {
+        Text(content)
+          .fontSize(15)
+          .fontColor('#FFFFFF')
+          .fontWeight(FontWeight.Normal)
+          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      }
+      .backgroundColor('#4A90D9')
+      .borderRadius(18)
+      .borderRadius({
+        topLeft: 18,
+        topRight: 4,
+        bottomLeft: 18,
+        bottomRight: 18
+      })
+      .maxWidth(280)
+      .margin({ left: 50, bottom: 6 })
     }
     .width('100%')
     .justifyContent(FlexAlign.End)
@@ -104,21 +143,50 @@ struct Chat {
   @Builder
   AIMessage(content: string) {
     Row() {
-      Text('🤖')
-        .fontSize(20)
-        .margin({ right: 8 })
+      Column() {
+        Text('🤖')
+          .fontSize(24)
+          .margin({ right: 8 })
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#FFFFFF')
+      .borderRadius(20)
+      .justifyContent(FlexAlign.Center)
+      .shadow({
+        radius: 6,
+        color: 'rgba(0,0,0,0.08)',
+        offsetX: 0,
+        offsetY: 2
+      })
+      .alignItems(HorizontalAlign.Center)
 
-      Text(content)
-        .fontSize(16)
-        .padding(12)
-        .backgroundColor('#FFFFFF')
-        .foregroundColor('#333333')
-        .borderRadius(15)
-        .shadow({ radius: 2, color: '#10000000' })
+      Column() {
+        Text(content)
+          .fontSize(15)
+          .fontColor('#333333')
+          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      }
+      .backgroundColor('#FFFFFF')
+      .borderRadius(18)
+      .borderRadius({
+        topLeft: 4,
+        topRight: 18,
+        bottomLeft: 18,
+        bottomRight: 18
+      })
+      .maxWidth(280)
+      .shadow({
+        radius: 8,
+        color: 'rgba(0,0,0,0.06)',
+        offsetX: 0,
+        offsetY: 2
+      })
+      .margin({ left: 8, bottom: 6 })
     }
     .width('100%')
     .justifyContent(FlexAlign.Start)
-    .margin({ bottom: 5 })
+    .alignItems(VerticalAlign.Top)
   }
 
   async sendMessage() {
