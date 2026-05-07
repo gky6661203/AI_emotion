@@ -1,5 +1,83 @@
 import http from '@ohos.net.http';
-import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation } from '../models/Types';
+import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport } from '../models/Types';
+
+interface Device {
+  id: string;
+  device_type?: string;
+  device_name?: string;
+  user_id?: string;
+  created_at?: string;
+}
+
+interface CreateAnonymousResponse {
+  user: User;
+  token: string;
+}
+
+interface SendMessageResponse {
+  message: ChatMessage;
+  ai_response?: ChatMessage;
+}
+
+interface CreateLetterResponse {
+  letter: PrivateLetter;
+}
+
+interface BindDeviceResponse {
+  device: Device;
+}
+
+interface UploadVoiceRecordResponse {
+  voice_record: VoiceRecord;
+}
+
+interface TranscribeVoiceResponse {
+  voice_record: VoiceRecord;
+  transcript: string;
+}
+
+interface AnalyzeVoiceResponse {
+  voice_record: VoiceRecord;
+  emotion: string;
+  emotion_intensity: number;
+}
+
+interface GetRecommendationsResponse {
+  recommendations: Recommendation[];
+}
+
+interface HttpResponseData {
+  responseCode: number;
+  result: string | ArrayBuffer | undefined;
+}
+
+interface AnonymousRequest {
+  campus?: string;
+  enrollment_year?: number;
+}
+
+interface BindDeviceRequest {
+  device_id: string;
+  device_type?: string;
+  device_name?: string;
+}
+
+interface SendMessageRequest {
+  content: string;
+}
+
+interface CreateLetterRequest {
+  content: string;
+  title?: string;
+}
+
+interface UploadVoiceRequest {
+  file_url: string;
+  duration_seconds?: number;
+}
+
+interface EmptyRequest {
+}
 
 const BASE_URL = 'http://localhost:8080';
 const TIMEOUT = 30000;
@@ -16,14 +94,6 @@ export class ApiService {
     return this.token;
   }
 
-  private createHttpRequest(): http.HttpRequest {
-    let request = http.createHttpRequest();
-    request.method = http.RequestMethod;
-    request.connectTimeout = TIMEOUT;
-    request.readTimeout = TIMEOUT;
-    return request;
-  }
-
   private getHeaders(): Record<string, string> {
     let headers: Record<string, string> = {
       'Content-Type': 'application/json'
@@ -34,84 +104,98 @@ export class ApiService {
     return headers;
   }
 
-  async request<T>(method: http.RequestMethod, path: string, body?: object): Promise<T> {
-    let request = this.createHttpRequest();
-    request.url = this.baseUrl + path;
-    request.method = method;
-    request.header = this.getHeaders();
+  async request<T>(method: string, path: string, body?: object): Promise<T> {
+    let httpRequest = http.createHttp();
+    let options: http.HttpRequestOptions = {
+      method: method as http.RequestMethod,
+      header: this.getHeaders(),
+      connectTimeout: TIMEOUT,
+      readTimeout: TIMEOUT,
+      extraData: body ? JSON.stringify(body) : undefined
+    };
 
-    let response = await request.request(body ? JSON.stringify(body) : '');
-    if (response.responseCode !== 200 && response.responseCode !== 201) {
-      throw new Error(`HTTP ${response.responseCode}: ${response.result}`);
+    let url = this.baseUrl + path;
+    let response = await httpRequest.request(url, options);
+
+    let httpResponse = response as HttpResponseData;
+    if (httpResponse.responseCode !== 200 && httpResponse.responseCode !== 201) {
+      throw new Error(`HTTP ${httpResponse.responseCode}`);
     }
 
-    return JSON.parse(response.result as string) as T;
+    return JSON.parse(httpResponse.result as string) as T;
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      await this.request<{ status: string }>('GET', '/health');
+      await this.request<Record<string, string>>('GET', '/health');
       return true;
     } catch {
       return false;
     }
   }
 
-  async createAnonymous(campus?: string, enrollmentYear?: number): Promise<{ user: User, token: string }> {
-    let result = await this.request<{ user: User, token: string }>('POST', '/api/auth/anonymous', {
-      campus,
+  async createAnonymous(campus?: string, enrollmentYear?: number): Promise<CreateAnonymousResponse> {
+    let body: AnonymousRequest = {
+      campus: campus,
       enrollment_year: enrollmentYear
-    });
+    };
+    let result = await this.request<CreateAnonymousResponse>('POST', '/api/auth/anonymous', body);
     this.token = result.token;
     return result;
   }
 
-  async bindDevice(deviceId: string, deviceType?: string, deviceName?: string): Promise<{ device: any }> {
-    return this.request<{ device: any }>('POST', '/api/devices/bind', {
+  async bindDevice(deviceId: string, deviceType?: string, deviceName?: string): Promise<BindDeviceResponse> {
+    let body: BindDeviceRequest = {
       device_id: deviceId,
       device_type: deviceType,
       device_name: deviceName
-    });
+    };
+    return this.request<BindDeviceResponse>('POST', '/api/devices/bind', body);
   }
 
-  async sendMessage(content: string): Promise<{ message: ChatMessage, ai_response?: ChatMessage }> {
-    return this.request<{ message: ChatMessage, ai_response?: ChatMessage }>('POST', '/api/chat/messages', {
-      content
-    });
+  async sendMessage(content: string): Promise<SendMessageResponse> {
+    let body: SendMessageRequest = {
+      content: content
+    };
+    return this.request<SendMessageResponse>('POST', '/api/chat/messages', body);
   }
 
-  async createLetter(content: string, title?: string): Promise<{ letter: PrivateLetter }> {
-    return this.request<{ letter: PrivateLetter }>('POST', '/api/private-letters', {
-      content,
-      title
-    });
+  async createLetter(content: string, title?: string): Promise<CreateLetterResponse> {
+    let body: CreateLetterRequest = {
+      content: content,
+      title: title
+    };
+    return this.request<CreateLetterResponse>('POST', '/api/private-letters', body);
   }
 
-  async uploadVoiceRecord(fileUrl: string, durationSeconds?: number): Promise<{ voice_record: VoiceRecord }> {
-    return this.request<{ voice_record: VoiceRecord }>('POST', '/api/voice-records', {
+  async uploadVoiceRecord(fileUrl: string, durationSeconds?: number): Promise<UploadVoiceRecordResponse> {
+    let body: UploadVoiceRequest = {
       file_url: fileUrl,
       duration_seconds: durationSeconds
-    });
+    };
+    return this.request<UploadVoiceRecordResponse>('POST', '/api/voice-records', body);
   }
 
-  async transcribeVoice(recordId: string): Promise<{ voice_record: VoiceRecord, transcript: string }> {
-    return this.request<{ voice_record: VoiceRecord, transcript: string }>(
+  async transcribeVoice(recordId: string): Promise<TranscribeVoiceResponse> {
+    let body: EmptyRequest = {};
+    return this.request<TranscribeVoiceResponse>(
       'POST',
       `/api/voice-records/${recordId}/transcribe`,
-      {}
+      body
     );
   }
 
-  async analyzeVoice(recordId: string): Promise<{ voice_record: VoiceRecord, emotion: string, emotion_intensity: number }> {
-    return this.request<any>('POST', `/api/voice-records/${recordId}/analyze`, {});
+  async analyzeVoice(recordId: string): Promise<AnalyzeVoiceResponse> {
+    let body: EmptyRequest = {};
+    return this.request<AnalyzeVoiceResponse>('POST', `/api/voice-records/${recordId}/analyze`, body);
   }
 
-  async getRecommendations(limit?: number): Promise<{ recommendations: Recommendation[] }> {
-    return this.request<{ recommendations: Recommendation[] }>('GET', `/api/recommendations/current?limit=${limit || 5}`);
+  async getRecommendations(limit?: number): Promise<GetRecommendationsResponse> {
+    return this.request<GetRecommendationsResponse>('GET', `/api/recommendations/current?limit=${limit || 5}`);
   }
 
-  async getEmotionReport(days?: number): Promise<any> {
-    return this.request<any>('GET', `/api/emotions/report?days=${days || 7}`);
+  async getEmotionReport(days?: number): Promise<EmotionReport> {
+    return this.request<EmotionReport>('GET', `/api/emotions/report?days=${days || 7}`);
   }
 }
 

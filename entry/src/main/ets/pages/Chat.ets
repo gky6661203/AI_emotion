@@ -8,7 +8,7 @@ struct Chat {
   @State messages: ChatMessage[] = [];
   @State inputText: string = '';
   @State isLoading: boolean = false;
-  @State scroller: Scroller = new Scroller();
+  scroller: Scroller = new Scroller();
 
   build() {
     Column() {
@@ -133,7 +133,7 @@ struct Chat {
         bottomLeft: 18,
         bottomRight: 18
       })
-      .maxWidth(280)
+      .constraintSize({ maxWidth: '280vp' })
       .margin({ left: 50, bottom: 6 })
     }
     .width('100%')
@@ -175,7 +175,7 @@ struct Chat {
         bottomLeft: 18,
         bottomRight: 18
       })
-      .maxWidth(280)
+      .constraintSize({ maxWidth: '280vp' })
       .shadow({
         radius: 8,
         color: 'rgba(0,0,0,0.06)',

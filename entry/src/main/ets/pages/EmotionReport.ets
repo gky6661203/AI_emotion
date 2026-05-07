@@ -1,6 +1,16 @@
 import router from '@ohos.router';
-import { EmotionReport } from '../models/Types';
+import { EmotionReport, EmotionDistributionItem } from '../models/Types';
 import { apiService } from '../services/ApiService';
+
+
+
+interface RecentRecord {
+  emotion?: string;
+  content?: string;
+  created_at?: string;
+  intensity?: number;
+  risk_detected?: boolean;
+}
 
 @Entry
 @Component
@@ -187,7 +197,7 @@ struct EmotionReportPage {
 
       if (this.report?.emotion_distribution && this.report.emotion_distribution.length > 0) {
         Column() {
-          ForEach(this.report?.emotion_distribution || [], (item: { emotion: string, count: number }) => {
+          ForEach(this.report?.emotion_distribution || [], (item: EmotionDistributionItem) => {
             Row() {
               Text(this.getEmotionEmoji(item.emotion))
                 .fontSize(18)
@@ -200,7 +210,7 @@ struct EmotionReportPage {
 
               Column() {
                 Row() {
-                  Rectangle()
+                  Rect()
                     .width(Math.max(20, (item.count / (this.report?.total_records || 1)) * 180))
                     .height(8)
                     .fill(this.getEmotionColor(item.emotion))
@@ -258,18 +268,18 @@ struct EmotionReportPage {
         .margin({ bottom: 12 })
 
       if (this.report?.recent_records && this.report.recent_records.length > 0) {
-        ForEach(this.report.recent_records.slice(0, 5), (record: any, index: number) => {
+        ForEach(this.report.recent_records.slice(0, 5), (record: RecentRecord, index: number) => {
           Row() {
-            Text(this.getEmotionEmoji(record.emotion))
+            Text(this.getEmotionEmoji(record.emotion || 'neutral'))
               .fontSize(22)
               .width(40)
 
             Column() {
-              Text(record.emotion)
+              Text(record.emotion || 'unknown')
                 .fontSize(14)
                 .fontColor('#333333')
                 .fontWeight(FontWeight.Medium)
-              Text(record.created_at.split('T')[0])
+              Text(record.created_at ? record.created_at.split('T')[0] : '')
                 .fontSize(12)
                 .fontColor('#999999')
                 .margin({ top: 2 })
@@ -288,7 +298,7 @@ struct EmotionReportPage {
           .width('100%')
           .padding({ top: 10, bottom: 10 })
           .border({
-            width: { bottom: index < Math.min(this.report.recent_records.length, 5) - 1 ? 1 : 0 },
+            width: { bottom: index < Math.min(this.report?.recent_records?.length || 0, 5) - 1 ? 1 : 0 },
             color: '#F5F5F5'
           })
         })

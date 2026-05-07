@@ -73,6 +73,11 @@ export interface Recommendation {
   data?: object;
 }
 
+export interface EmotionDistributionItem {
+  emotion: string;
+  count: number;
+}
+
 export interface EmotionReport {
   user_id: string;
   period_start: string;
@@ -81,6 +86,6 @@ export interface EmotionReport {
   average_intensity: number;
   total_records: number;
   risk_events_count: number;
-  emotion_distribution: Array<{ emotion: string; count: number }>;
-  recent_records: any[];
+  emotion_distribution: EmotionDistributionItem[];
+  recent_records: object[];
 }

@@ -42,7 +42,7 @@ struct VoiceRecordPage {
         Column() {
           Text(this.formatDuration(this.recordingDuration))
             .fontSize(56)
-            .fontWeight(FontWeight.Light)
+            .fontWeight(FontWeight.Lighter)
             .fontColor(this.isRecording ? '#FF6B6B' : '#333333')
 
           Text(this.isRecording ? '录音中...' : '点击下方按钮开始录音')
@@ -68,7 +68,7 @@ struct VoiceRecordPage {
               .fill('#FF6B6B')
 
             Column() {
-              Rectangle()
+              Rect()
                 .width(24)
                 .height(24)
                 .fill('#FFFFFF')
@@ -255,28 +255,30 @@ struct VoiceRecordPage {
     this.isRecording = false;
 
     let mockUrl = `file://temp/voice_${Date.now()}.m4a`;
+    let duration = this.recordingDuration;
 
-    apiService.uploadVoiceRecord(mockUrl, this.recordingDuration).then(result => {
-      this.voiceRecords.unshift(result.voice_record);
+    apiService.uploadVoiceRecord(mockUrl, duration).then((result) => {
+      let record = result.voice_record;
+      this.voiceRecords.unshift(record);
       this.currentTranscript = '这是一段语音转文字的内容。';
 
-      if (result.voice_record.id) {
-        this.analyzeRecord(result.voice_record.id);
+      if (record.id) {
+        this.analyzeRecord(record.id);
       }
-    }).catch(error => {
+    }).catch((error: Error) => {
       console.error('Failed to upload voice record:', error);
     });
   }
 
   analyzeRecord(recordId: string) {
-    apiService.analyzeVoice(recordId).then(result => {
+    apiService.analyzeVoice(recordId).then((result) => {
       this.currentEmotion = result.emotion;
 
       let index = this.voiceRecords.findIndex(r => r.id === recordId);
       if (index >= 0) {
         this.voiceRecords[index].emotion = result.emotion;
       }
-    }).catch(error => {
+    }).catch((error: Error) => {
       console.error('Failed to analyze voice:', error);
     });
   }

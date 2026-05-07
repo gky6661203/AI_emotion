@@ -24,27 +24,27 @@ struct Index {
       TabContent() {
         this.HomeTab()
       }
-      .tabBar(this.TabBarItem('首页', $r('sys.media.ohos_ic_home'), 0))
+      .tabBar(this.TabBarItem('首页', '🏠', 0))
 
       TabContent() {
         this.ChatTab()
       }
-      .tabBar(this.TabBarItem('聊天', $r('sys.media.ohos_ic_chat'), 1))
+      .tabBar(this.TabBarItem('聊天', '💬', 1))
 
       TabContent() {
         this.TreeHoleTab()
       }
-      .tabBar(this.TabBarItem('树洞', $r('sys.media.ohos_ic_mail'), 2))
+      .tabBar(this.TabBarItem('树洞', '📮', 2))
 
       TabContent() {
         this.VoiceTab()
       }
-      .tabBar(this.TabBarItem('语音', $r('sys.media.ohos_ic_voice'), 3))
+      .tabBar(this.TabBarItem('语音', '🎤', 3))
 
       TabContent() {
         this.SettingsTab()
       }
-      .tabBar(this.TabBarItem('设置', $r('sys.media.ohos_ic_settings'), 4))
+      .tabBar(this.TabBarItem('设置', '⚙️', 4))
     }
     .barHeight(65)
     .barBackgroundColor('#FFFFFF')
@@ -54,12 +54,11 @@ struct Index {
   }
 
   @Builder
-  TabBarItem(title: string, icon: Resource, index: number) {
+  TabBarItem(title: string, icon: string, index: number) {
     Column() {
-      Image(icon)
-        .width(24)
-        .height(24)
-        .fillColor(this.currentTab === index ? '#4A90D9' : '#999999')
+      Text(icon)
+        .fontSize(20)
+        .fontColor(this.currentTab === index ? '#4A90D9' : '#999999')
       Text(title)
         .fontSize(10)
         .fontColor(this.currentTab === index ? '#4A90D9' : '#999999')

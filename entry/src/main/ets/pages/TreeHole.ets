@@ -12,154 +12,156 @@ struct TreeHole {
   @State isLoading: boolean = false;
 
   build() {
-    Column() {
-      // Header
-      Row() {
-        Text('<')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#333333')
-          .margin({ left: 15 })
-          .onClick(() => router.back())
-
-        Text('私密树洞')
-          .fontSize(18)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#333333')
-          .margin({ left: 10 })
-
-        Blank()
-
-        Button('写一封')
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .backgroundColor('#4CAF50')
-          .borderRadius(16)
-          .height(32)
-          .margin({ right: 15 })
-          .onClick(() => this.showCreateDialog = true)
-      }
-      .width('100%')
-      .height(56)
-      .backgroundColor('#FFFFFF')
-      .shadow({
-        radius: 4,
-        color: 'rgba(0,0,0,0.05)',
-        offsetY: 2
-      })
-
-      if (this.letters.length === 0) {
-        Column() {
-          Column() {
-            Text('📮')
-              .fontSize(70)
-              .margin({ top: 80 })
-            Text('还没有树洞')
-              .fontSize(18)
-              .fontColor('#666666')
-              .fontWeight(FontWeight.Medium)
-              .margin({ top: 20 })
-            Text('写下你的第一个心事吧')
-              .fontSize(14)
-              .fontColor('#999999')
-              .margin({ top: 8 })
-          }
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .backgroundColor('#F8F9FA')
-      } else {
-        List() {
-          ForEach(this.letters, (letter: PrivateLetter) => {
-            ListItem() {
-              this.LetterCard(letter)
-            }
-          })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 15, right: 15, top: 12 })
-        .backgroundColor('#F8F9FA')
-      }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#FFFFFF')
-
-    if (this.showCreateDialog) {
+    Stack({ alignContent: Alignment.TopStart }) {
       Column() {
-        Column() {
-          Row() {
-            Text('写树洞')
-              .fontSize(18)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#333333')
-            Blank()
-            Text('✕')
-              .fontSize(20)
-              .fontColor('#999999')
-              .onClick(() => this.showCreateDialog = false)
-          }
-          .width('100%')
-          .padding(20)
-          .border({
-            width: { bottom: 1 },
-            color: '#F0F0F0'
-          })
+        // Header
+        Row() {
+          Text('<')
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#333333')
+            .margin({ left: 15 })
+            .onClick(() => router.back())
 
-          TextInput({ placeholder: '标题（可选）' })
-            .width('100%')
-            .height(48)
-            .backgroundColor('#F8F9FA')
-            .borderRadius(12)
-            .padding({ left: 16, right: 16 })
-            .fontSize(15)
-            .margin({ top: 16 })
-            .onChange((value: string) => this.newTitle = value)
+          Text('私密树洞')
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#333333')
+            .margin({ left: 10 })
 
-          TextArea({ placeholder: '在这里写下你的心事，我会用心倾听...' })
-            .width('100%')
-            .height(180)
-            .backgroundColor('#F8F9FA')
-            .borderRadius(12)
-            .padding(16)
-            .fontSize(15)
-            .margin({ top: 12 })
-            .onChange((value: string) => this.newContent = value)
+          Blank()
 
-          Row() {
-            Button('取消')
-              .width('45%')
-              .height(48)
-              .backgroundColor('#F5F5F5')
-              .fontColor('#666666')
-              .fontSize(15)
-              .borderRadius(24)
-              .onClick(() => this.showCreateDialog = false)
-
-            Button('发布')
-              .width('45%')
-              .height(48)
-              .backgroundColor(this.newContent.length > 0 ? '#4CAF50' : '#CCCCCC')
-              .fontColor('#FFFFFF')
-              .fontSize(15)
-              .fontWeight(FontWeight.Medium)
-              .borderRadius(24)
-              .margin({ left: '10%' })
-              .enabled(this.newContent.length > 0 && !this.isLoading)
-              .onClick(() => this.createLetter())
-          }
-          .width('100%')
-          .margin({ top: 20 })
+          Button('写一封')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .backgroundColor('#4CAF50')
+            .borderRadius(16)
+            .height(32)
+            .margin({ right: 15 })
+            .onClick(() => this.showCreateDialog = true)
         }
-        .width('92%')
+        .width('100%')
+        .height(56)
         .backgroundColor('#FFFFFF')
-        .borderRadius(20)
+        .shadow({
+          radius: 4,
+          color: 'rgba(0,0,0,0.05)',
+          offsetY: 2
+        })
+
+        if (this.letters.length === 0) {
+          Column() {
+            Column() {
+              Text('📮')
+                .fontSize(70)
+                .margin({ top: 80 })
+              Text('还没有树洞')
+                .fontSize(18)
+                .fontColor('#666666')
+                .fontWeight(FontWeight.Medium)
+                .margin({ top: 20 })
+              Text('写下你的第一个心事吧')
+                .fontSize(14)
+                .fontColor('#999999')
+                .margin({ top: 8 })
+            }
+            .layoutWeight(1)
+          }
+          .width('100%')
+          .backgroundColor('#F8F9FA')
+        } else {
+          List() {
+            ForEach(this.letters, (letter: PrivateLetter) => {
+              ListItem() {
+                this.LetterCard(letter)
+              }
+            })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .padding({ left: 15, right: 15, top: 12 })
+          .backgroundColor('#F8F9FA')
+        }
       }
       .width('100%')
       .height('100%')
-      .backgroundColor('rgba(0,0,0,0.5)')
-      .justifyContent(FlexAlign.Center)
+      .backgroundColor('#FFFFFF')
+
+      if (this.showCreateDialog) {
+        Column() {
+          Column() {
+            Row() {
+              Text('写树洞')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#333333')
+              Blank()
+              Text('✕')
+                .fontSize(20)
+                .fontColor('#999999')
+                .onClick(() => this.showCreateDialog = false)
+            }
+            .width('100%')
+            .padding(20)
+            .border({
+              width: { bottom: 1 },
+              color: '#F0F0F0'
+            })
+
+            TextInput({ placeholder: '标题（可选）' })
+              .width('100%')
+              .height(48)
+              .backgroundColor('#F8F9FA')
+              .borderRadius(12)
+              .padding({ left: 16, right: 16 })
+              .fontSize(15)
+              .margin({ top: 16 })
+              .onChange((value: string) => this.newTitle = value)
+
+            TextArea({ placeholder: '在这里写下你的心事，我会用心倾听...' })
+              .width('100%')
+              .height(180)
+              .backgroundColor('#F8F9FA')
+              .borderRadius(12)
+              .padding(16)
+              .fontSize(15)
+              .margin({ top: 12 })
+              .onChange((value: string) => this.newContent = value)
+
+            Row() {
+              Button('取消')
+                .width('45%')
+                .height(48)
+                .backgroundColor('#F5F5F5')
+                .fontColor('#666666')
+                .fontSize(15)
+                .borderRadius(24)
+                .onClick(() => this.showCreateDialog = false)
+
+              Button('发布')
+                .width('45%')
+                .height(48)
+                .backgroundColor(this.newContent.length > 0 ? '#4CAF50' : '#CCCCCC')
+                .fontColor('#FFFFFF')
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .borderRadius(24)
+                .margin({ left: '10%' })
+                .enabled(this.newContent.length > 0 && !this.isLoading)
+                .onClick(() => this.createLetter())
+            }
+            .width('100%')
+            .margin({ top: 20 })
+          }
+          .width('92%')
+          .backgroundColor('#FFFFFF')
+          .borderRadius(20)
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(0,0,0,0.5)')
+        .justifyContent(FlexAlign.Center)
+      }
     }
   }
 
