@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: race_user
       POSTGRES_PASSWORD: race_password
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
@@ -58,14 +58,16 @@ services:
 
   core-api:
     build:
-      context: ../../services/core-api
-      dockerfile: ../../infra/docker/Dockerfile.core-api
+      context: ../../services/core-api-java
+      dockerfile: ../../infra/docker/Dockerfile.core-api-java
     container_name: race_core_api
     environment:
-      DATABASE_URL: postgres://race_user:race_password@postgres:5432/race_emotion
-      REDIS_URL: redis://redis:6379
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/race_emotion
+      SPRING_DATASOURCE_USERNAME: race_user
+      SPRING_DATASOURCE_PASSWORD: race_password
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       AI_ENGINE_URL: http://ai-engine:8090
-      RUST_LOG: info
     ports:
       - "8080:8080"
     depends_on:
@@ -73,6 +75,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ai-engine:
+        condition: service_started
     networks:
       - race_network
 

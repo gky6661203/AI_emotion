@@ -30,7 +30,7 @@ switch ($Service) {
 
     "migrate" {
         Write-Host "Running database migrations..." -ForegroundColor Cyan
-        docker exec -it race_postgres psql -U race_user -d race_emotion -f /docker-entrypoint-initdb.d/001_init_core_tables.sql
+        & "$ROOT/scripts/db_init.ps1"
         Write-Host "Database migration completed!" -ForegroundColor Green
     }
 
@@ -38,21 +38,25 @@ switch ($Service) {
         Write-Host "Starting AI Engine..." -ForegroundColor Cyan
         Push-Location "$ROOT/services/ai-engine"
         try {
-            if (Test-Path "venv") {
-                & "$ROOT/services/ai-engine/venv/Scripts/python" -m uvicorn main:app --host 0.0.0.0 --port 8090 --reload
-            } else {
-                py -m uvicorn main:app --host 0.0.0.0 --port 8090 --reload
-            }
+            $python = "D:\python\anaconda3\python.exe"
+            
+            & $python -m pip install fastapi==0.109.0 uvicorn[standard]==0.27.0 pydantic==1.10.14 python-multipart==0.0.6 httpx==0.26.0 jinja2==3.1.3 -q
+            
+            & $python -m uvicorn main:app --host 0.0.0.0 --port 8090 --reload
         } finally {
             Pop-Location
         }
     }
 
     "core-api" {
-        Write-Host "Starting Core API..." -ForegroundColor Cyan
-        Push-Location "$ROOT/services/core-api"
+        Write-Host "Starting Core API (Java)..." -ForegroundColor Cyan
+        Push-Location "$ROOT/services/core-api-java"
         try {
-            cargo run
+            Write-Host "Building project..." -ForegroundColor Gray
+            mvn clean package -DskipTests -q
+            
+            Write-Host "Running Core API on http://localhost:8080" -ForegroundColor Green
+            java -jar target/core-api-1.0.0.jar
         } finally {
             Pop-Location
         }

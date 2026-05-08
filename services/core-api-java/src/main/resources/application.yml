@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:15432/race_emotion
+    username: race_user
+    password: race_password
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# AI Engine Configuration
+ai:
+  engine:
+    url: http://localhost:8091
+
+logging:
+  level:
+    com.example.coreapi: DEBUG
+    org.hibernate.SQL: DEBUG

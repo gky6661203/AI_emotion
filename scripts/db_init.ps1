@@ -18,8 +18,7 @@ if (-not (Test-Path $sqlFile)) {
 
 Write-Host "Executing: $sqlFile" -ForegroundColor Gray
 
-docker exec -i $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME < $sqlFile
-
+Get-Content $sqlFile | docker exec -i $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Database initialized successfully!" -ForegroundColor Green
 } else {
@@ -31,7 +30,7 @@ if ($LASTEXITCODE -eq 0) {
 $configFile = Join-Path $PSScriptRoot "../infra/sql/003_seed_config.sql"
 if (Test-Path $configFile) {
     Write-Host "Running config seed..." -ForegroundColor Gray
-    docker exec -i $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME < $configFile
+   Get-Content $sqlFile | docker exec -i $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME< $configFile
 }
 
 Write-Host "Database setup complete!" -ForegroundColor Green
