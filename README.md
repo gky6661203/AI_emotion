@@ -53,21 +53,20 @@ AI Engine
 ## 五、技术栈
 
 - OpenHarmony 6.0+ / ArkTS / ArkUI
-- Java 21 / Spring Boot 3 / Spring Data JPA
+- TypeScript / Express
 - Python / FastAPI
-- PostgreSQL / Redis / MinIO
+- PostgreSQL
 - Docker Compose
 
 ## 六、项目目录结构
 
 ```text
-race_emotion/
-├── apps/
-│   ├── openharmony/          # ArkUI / ArkTS 客户端
-│   └── admin-web/            # 管理后台，后期建设
+AIemotion/
+├── entry/                    # OpenHarmony ArkTS 客户端
 ├── services/
-│   ├── core-api-java/        # Java / Spring Boot 业务后端
-│   └── ai-engine/            # Python AI 服务
+│   ├── ts-api/               # TypeScript / Express 业务后端
+│   ├── ai-engine/            # Python FastAPI AI 服务
+│   └── python-tools/         # Python 工具脚本
 ├── infra/
 │   ├── docker/               # Docker Compose 与服务编排
 │   └── sql/                  # 数据库初始化脚本

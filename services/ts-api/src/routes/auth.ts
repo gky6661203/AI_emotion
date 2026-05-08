@@ -20,20 +20,20 @@ router.post('/anonymous', async (req: Request, res: Response) => {
     const stateVectorId = uuidv4();
     const now = new Date().toISOString();
 
-    execute(
+    await execute(
       `INSERT INTO users (id, anonymous_token, campus, enrollment_year, risk_level, state_vector_id, total_interactions, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [userId, token, campus || null, enrollment_year || null, 'low', stateVectorId, 0, now, now]
     );
 
-    execute(
+    await execute(
       `INSERT INTO user_state_vectors (id, user_id, dimension_valence, dimension_arousal, dimension_dominance, dimension_social, dimension_cognitive, computed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [stateVectorId, userId, 0.5, 0.5, 0.5, 0.5, 0.5, now]
     );
 
-    const user = queryOne<User>(
-      'SELECT * FROM users WHERE id = ?',
+    const user = await queryOne<User>(
+      'SELECT * FROM users WHERE id = $1',
       [userId]
     );
 

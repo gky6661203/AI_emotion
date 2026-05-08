@@ -28,9 +28,9 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    execute(
+    await execute(
       `INSERT INTO private_letters (id, user_id, title, content, content_type, allow_ai_analysis, emotion, emotion_intensity, write_to_emotion_profile, is_public, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10)`,
       [
         letterId, userId, title || null, content, 'text',
         allow_ai_analysis ? 1 : 0, emotion || null, emotionIntensity || null,
@@ -38,8 +38,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       ]
     );
 
-    const letter = queryOne<PrivateLetter>(
-      'SELECT * FROM private_letters WHERE id = ?',
+    const letter = await queryOne<PrivateLetter>(
+      'SELECT * FROM private_letters WHERE id = $1',
       [letterId]
     );
 
@@ -55,8 +55,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const userId = req.user!.id;
 
-    const letter = queryOne<PrivateLetter>(
-      'SELECT * FROM private_letters WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+    const letter = await queryOne<PrivateLetter>(
+      'SELECT * FROM private_letters WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL',
       [id, userId]
     );
 

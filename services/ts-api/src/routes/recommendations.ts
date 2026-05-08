@@ -12,9 +12,9 @@ router.get('/current', async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
     const limit = parseInt(req.query.limit as string) || 5;
 
-    const recentEmotions = query<{ emotion: string; intensity: number }>(
+    const recentEmotions = await query<{ emotion: string; intensity: number }>(
       `SELECT emotion, intensity FROM emotion_records
-       WHERE user_id = ?
+       WHERE user_id = $1
        ORDER BY created_at DESC
        LIMIT 10`,
       [userId]
