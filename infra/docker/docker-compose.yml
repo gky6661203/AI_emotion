@@ -3,27 +3,27 @@ version: '3.8'
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: race_postgres
+    container_name: aiemotion_postgres
     environment:
-      POSTGRES_DB: race_emotion
-      POSTGRES_USER: race_user
-      POSTGRES_PASSWORD: race_password
+      POSTGRES_DB: aiemotion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "15432:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U race_user -d race_emotion"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aiemotion"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - race_network
+      - aiemotion_network
 
   redis:
     image: redis:7-alpine
-    container_name: race_redis
+    container_name: aiemotion_redis
     ports:
       - "6379:6379"
     volumes:
@@ -34,11 +34,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - race_network
+      - aiemotion_network
 
   minio:
     image: minio/minio:latest
-    container_name: race_minio
+    container_name: aiemotion_minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -54,20 +54,18 @@ services:
       timeout: 20s
       retries: 3
     networks:
-      - race_network
+      - aiemotion_network
 
-  core-api:
+  ts-api:
     build:
-      context: ../../services/core-api-java
-      dockerfile: ../../infra/docker/Dockerfile.core-api-java
-    container_name: race_core_api
+      context: ../../services/ts-api
+      dockerfile: ../../infra/docker/Dockerfile.ts-api
+    container_name: aiemotion_ts_api
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/race_emotion
-      SPRING_DATASOURCE_USERNAME: race_user
-      SPRING_DATASOURCE_PASSWORD: race_password
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      AI_ENGINE_URL: http://ai-engine:8090
+      PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/aiemotion
+      REDIS_URL: redis://redis:6379
+      PYTHON_TOOLS_PATH: /app/python-tools
     ports:
       - "8080:8080"
     depends_on:
@@ -75,25 +73,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ai-engine:
-        condition: service_started
     networks:
-      - race_network
-
-  ai-engine:
-    build:
-      context: ../../services/ai-engine
-      dockerfile: ../../infra/docker/Dockerfile.ai-engine
-    container_name: race_ai_engine
-    environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      LLM_PROVIDER: rules
-      AI_ENGINE_HOST: 0.0.0.0
-      AI_ENGINE_PORT: 8090
-    ports:
-      - "8090:8090"
-    networks:
-      - race_network
+      - aiemotion_network
 
 volumes:
   postgres_data:
@@ -101,5 +82,5 @@ volumes:
   minio_data:
 
 networks:
-  race_network:
+  aiemotion_network:
     driver: bridge
