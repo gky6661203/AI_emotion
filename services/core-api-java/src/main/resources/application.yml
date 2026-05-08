@@ -25,7 +25,7 @@ spring:
 # AI Engine Configuration
 ai:
   engine:
-    url: http://localhost:8091
+    url: http://localhost:8090
 
 logging:
   level:
