@@ -16,14 +16,14 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const now = new Date().toISOString();
 
     const recordId = uuidv4();
-    await execute(
+    execute(
       `INSERT INTO voice_records (id, user_id, file_url, duration_seconds, risk_level, transcription_status, analysis_status, allow_ai_analysis, write_to_emotion_profile, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [recordId, userId, file_url, duration_seconds || null, 'low', 'pending', 'pending', true, true, now]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [recordId, userId, file_url, duration_seconds || null, 'low', 'pending', 'pending', 1, 1, now]
     );
 
-    const record = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1',
+    const record = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ?',
       [recordId]
     );
 
@@ -39,8 +39,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const userId = req.user!.id;
 
-    const record = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL',
+    const record = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
       [id, userId]
     );
 
@@ -61,8 +61,8 @@ router.post('/:id/transcribe', async (req: AuthenticatedRequest, res: Response) 
     const { id } = req.params;
     const userId = req.user!.id;
 
-    const record = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1 AND user_id = $2',
+    const record = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ? AND user_id = ?',
       [id, userId]
     );
 
@@ -71,8 +71,8 @@ router.post('/:id/transcribe', async (req: AuthenticatedRequest, res: Response) 
       return;
     }
 
-    await execute(
-      'UPDATE voice_records SET transcription_status = $1 WHERE id = $2',
+    execute(
+      'UPDATE voice_records SET transcription_status = ? WHERE id = ?',
       ['processing', id]
     );
 
@@ -84,13 +84,13 @@ router.post('/:id/transcribe', async (req: AuthenticatedRequest, res: Response) 
       transcript = data.transcript || transcript;
     }
 
-    await execute(
-      'UPDATE voice_records SET transcript = $1, transcription_status = $2 WHERE id = $3',
+    execute(
+      'UPDATE voice_records SET transcript = ?, transcription_status = ? WHERE id = ?',
       [transcript, 'completed', id]
     );
 
-    const updatedRecord = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1',
+    const updatedRecord = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ?',
       [id]
     );
 
@@ -106,8 +106,8 @@ router.post('/:id/analyze', async (req: AuthenticatedRequest, res: Response) => 
     const { id } = req.params;
     const userId = req.user!.id;
 
-    const record = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1 AND user_id = $2',
+    const record = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ? AND user_id = ?',
       [id, userId]
     );
 
@@ -128,22 +128,22 @@ router.post('/:id/analyze', async (req: AuthenticatedRequest, res: Response) => 
       emotionIntensity = data.intensity || 0.5;
     }
 
-    await execute(
-      'UPDATE voice_records SET emotion = $1, emotion_intensity = $2, analysis_status = $3 WHERE id = $4',
+    execute(
+      'UPDATE voice_records SET emotion = ?, emotion_intensity = ?, analysis_status = ? WHERE id = ?',
       [emotion, emotionIntensity, 'completed', id]
     );
 
     if (record.write_to_emotion_profile) {
       const emotionRecordId = uuidv4();
-      await execute(
+      execute(
         `INSERT INTO emotion_records (id, user_id, emotion, intensity, source, risk_detected, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [emotionRecordId, userId, emotion, emotionIntensity, 'voice', emotion === 'anxious' || emotion === 'angry', new Date().toISOString()]
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [emotionRecordId, userId, emotion, emotionIntensity, 'voice', emotion === 'anxious' || emotion === 'angry' ? 1 : 0, new Date().toISOString()]
       );
     }
 
-    const updatedRecord = await queryOne<VoiceRecord>(
-      'SELECT * FROM voice_records WHERE id = $1',
+    const updatedRecord = queryOne<VoiceRecord>(
+      'SELECT * FROM voice_records WHERE id = ?',
       [id]
     );
 

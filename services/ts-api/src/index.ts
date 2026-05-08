@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initDatabase } from './db';
 import { initRedis } from './db/redis';
 
 import authRoutes from './routes/auth';
@@ -18,6 +19,9 @@ const PORT = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.json());
+
+// Initialize database
+initDatabase();
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -39,7 +43,6 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 async function start() {
   try {
     await initRedis();
-    console.log('Redis initialized');
 
     app.listen(PORT, () => {
       console.log(`TypeScript API server running on port ${PORT}`);

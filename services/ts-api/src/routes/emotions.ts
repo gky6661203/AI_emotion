@@ -17,9 +17,9 @@ router.get('/report', async (req: AuthenticatedRequest, res: Response) => {
     const periodStart = startDate.toISOString();
     const periodEnd = new Date().toISOString();
 
-    const records = await query<EmotionRecord>(
+    const records = query<EmotionRecord>(
       `SELECT * FROM emotion_records
-       WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
+       WHERE user_id = ? AND created_at >= ? AND created_at <= ?
        ORDER BY created_at DESC`,
       [userId, periodStart, periodEnd]
     );

@@ -12,9 +12,9 @@ router.get('/current', async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
     const limit = parseInt(req.query.limit as string) || 5;
 
-    const recentEmotions = await query<{ emotion: string; intensity: number }>(
+    const recentEmotions = query<{ emotion: string; intensity: number }>(
       `SELECT emotion, intensity FROM emotion_records
-       WHERE user_id = $1
+       WHERE user_id = ?
        ORDER BY created_at DESC
        LIMIT 10`,
       [userId]
@@ -30,12 +30,12 @@ router.get('/current', async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    const dominantEmotion = recentEmotions.reduce((acc, curr) => {
-      acc[curr.emotion] = (acc[curr.emotion] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const dominantEmotionCount: Record<string, number> = {};
+    for (const rec of recentEmotions) {
+      dominantEmotionCount[rec.emotion] = (dominantEmotionCount[rec.emotion] || 0) + 1;
+    }
 
-    const topEmotion = Object.entries(dominantEmotion).sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
+    const topEmotion = Object.entries(dominantEmotionCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
 
     const emotionRecommendations: Record<string, Recommendation[]> = {
       happy: [

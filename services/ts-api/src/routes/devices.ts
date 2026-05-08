@@ -13,28 +13,28 @@ router.post('/bind', async (req: AuthenticatedRequest, res: Response) => {
     const { device_id, device_type, device_name } = req.body;
     const userId = req.user!.id;
 
-    const existing = await query<Device>(
-      'SELECT * FROM devices WHERE user_id = $1 AND device_id = $2',
+    const existing = query<Device>(
+      'SELECT * FROM devices WHERE user_id = ? AND device_id = ?',
       [userId, device_id]
     );
 
     if (existing.length > 0) {
-      await execute(
-        `UPDATE devices SET device_type = $1, device_name = $2, last_sync_at = $3, is_active = true
-         WHERE user_id = $4 AND device_id = $5`,
+      execute(
+        `UPDATE devices SET device_type = ?, device_name = ?, last_sync_at = ?, is_active = 1
+         WHERE user_id = ? AND device_id = ?`,
         [device_type, device_name, new Date().toISOString(), userId, device_id]
       );
     } else {
       const deviceId = uuidv4();
-      await execute(
+      execute(
         `INSERT INTO devices (id, user_id, device_id, device_type, device_name, is_active, created_at)
-         VALUES ($1, $2, $3, $4, $5, true, $6)`,
+         VALUES (?, ?, ?, ?, ?, 1, ?)`,
         [deviceId, userId, device_id, device_type || null, device_name || null, new Date().toISOString()]
       );
     }
 
-    const device = await query<Device>(
-      'SELECT * FROM devices WHERE user_id = $1 AND device_id = $2',
+    const device = query<Device>(
+      'SELECT * FROM devices WHERE user_id = ? AND device_id = ?',
       [userId, device_id]
     );
 
@@ -48,8 +48,8 @@ router.post('/bind', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const devices = await query<Device>(
-      'SELECT * FROM devices WHERE user_id = $1 AND is_active = true ORDER BY last_sync_at DESC',
+    const devices = query<Device>(
+      'SELECT * FROM devices WHERE user_id = ? AND is_active = 1 ORDER BY last_sync_at DESC',
       [userId]
     );
     res.json({ devices });

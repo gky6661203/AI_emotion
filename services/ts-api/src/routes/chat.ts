@@ -16,9 +16,9 @@ router.post('/messages', async (req: AuthenticatedRequest, res: Response) => {
     const now = new Date().toISOString();
 
     const userMessageId = uuidv4();
-    await execute(
+    execute(
       `INSERT INTO chat_messages (id, user_id, session_id, role, content, content_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [userMessageId, userId, session_id || null, 'user', content, 'text', now]
     );
 
@@ -33,23 +33,23 @@ router.post('/messages', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    await execute(
+    execute(
       `INSERT INTO chat_messages (id, user_id, session_id, role, content, content_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [aiMessageId, userId, session_id || null, 'assistant', aiContent, 'text', now]
     );
 
-    await execute(
-      'UPDATE users SET total_interactions = total_interactions + 1, updated_at = $1 WHERE id = $2',
+    execute(
+      'UPDATE users SET total_interactions = total_interactions + 1, updated_at = ? WHERE id = ?',
       [now, userId]
     );
 
-    const userMessage = await query<ChatMessage>(
-      'SELECT * FROM chat_messages WHERE id = $1',
+    const userMessage = query<ChatMessage>(
+      'SELECT * FROM chat_messages WHERE id = ?',
       [userMessageId]
     );
-    const aiMessage = await query<ChatMessage>(
-      'SELECT * FROM chat_messages WHERE id = $1',
+    const aiMessage = query<ChatMessage>(
+      'SELECT * FROM chat_messages WHERE id = ?',
       [aiMessageId]
     );
 

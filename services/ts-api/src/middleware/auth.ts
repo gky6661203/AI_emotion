@@ -21,8 +21,8 @@ export async function authMiddleware(
   const token = authHeader.substring(7);
 
   try {
-    const user = await queryOne<User>(
-      'SELECT * FROM users WHERE anonymous_token = $1 AND deleted_at IS NULL',
+    const user = queryOne<User>(
+      'SELECT * FROM users WHERE anonymous_token = ? AND deleted_at IS NULL',
       [token]
     );
 
