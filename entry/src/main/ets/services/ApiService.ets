@@ -1,5 +1,5 @@
 import http from '@ohos.net.http';
-import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport, EmotionTrendItem, EmotionAnalysis } from '../models/Types';
+import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport, EmotionTrendItem, EmotionAnalysis, PostsResponse, PostResponse, SuccessResponse } from '../models/Types';
 
 interface Device {
   id: string;
@@ -72,10 +72,6 @@ interface TrendsResponse {
   trends: EmotionTrendItem[];
 }
 
-interface SuccessResponse {
-  success: boolean;
-}
-
 interface HttpResponseData {
   responseCode: number;
   result: string | ArrayBuffer | undefined;
@@ -112,6 +108,16 @@ interface UploadVoiceRequest {
 }
 
 interface EmptyRequest {
+}
+
+interface CreatePostRequest {
+  content: string;
+  title?: string;
+  allow_comments?: boolean;
+}
+
+interface AddReactionRequest {
+  type: string;
 }
 
 const BASE_URL = 'http://localhost:8080';
@@ -297,6 +303,27 @@ export class ApiService {
 
   async getEmotionReport(days?: number): Promise<EmotionReport> {
     return this.request<EmotionReport>('GET', `/api/emotions/report?days=${days || 7}`);
+  }
+
+  // --- Plaza Posts ---
+  async listPosts(limit?: number): Promise<PostsResponse> {
+    return this.request<PostsResponse>('GET', `/api/posts?limit=${limit || 50}`);
+  }
+
+  async createPost(content: string, title?: string, allowComments: boolean = true): Promise<PostResponse> {
+    let body: CreatePostRequest = {
+      content: content,
+      title: title,
+      allow_comments: allowComments
+    };
+    return this.request<PostResponse>('POST', '/api/posts', body);
+  }
+
+  async addReaction(postId: string, type: string): Promise<SuccessResponse> {
+    let body: AddReactionRequest = {
+      type: type
+    };
+    return this.request<SuccessResponse>('POST', `/api/posts/${postId}/reactions`, body);
   }
 }
 

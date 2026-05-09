@@ -121,3 +121,50 @@ export interface EmotionReport {
   summary?: string;
   recent_records: EmotionRecord[];
 }
+
+export interface PostsResponse {
+  posts: PrivateLetter[];
+}
+
+export interface PostResponse {
+  post: PrivateLetter;
+}
+
+export interface VoiceRecordsResponse {
+  voice_records: VoiceRecord[];
+}
+
+export interface MessagesResponse {
+  messages: ChatMessage[];
+}
+
+export interface LettersResponse {
+  letters: PrivateLetter[];
+}
+
+export interface LetterResponse {
+  letter: PrivateLetter;
+}
+
+export interface VoiceUploadResponse {
+  voice_record: VoiceRecord;
+}
+
+export interface TranscribeResponse {
+  transcript: string;
+  voice_record: VoiceRecord;
+}
+
+export interface AnalyzeVoiceResponse {
+  emotion: string;
+  voice_record: VoiceRecord;
+}
+
+export interface TrendsResponse {
+  trends: EmotionTrendItem[];
+}
+
+export interface SuccessResponse {
+  success: boolean;
+  message?: string;
+}

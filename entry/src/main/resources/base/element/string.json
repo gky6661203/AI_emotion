@@ -1,16 +1,23 @@
 {
   "string": [
-    {
-      "name": "module_desc",
-      "value": "module description"
-    },
-    {
-      "name": "EntryAbility_desc",
-      "value": "description"
-    },
-    {
-      "name": "EntryAbility_label",
-      "value": "label"
-    }
+    { "name": "module_desc", "value": "情感陪伴应用入口模块" },
+    { "name": "EntryAbility_desc", "value": "情感陪伴应用主入口" },
+    { "name": "EntryAbility_label", "value": "情感陪伴" },
+    { "name": "top_greeting", "value": "你好，鸿蒙" },
+    { "name": "grid_emotion", "value": "情绪" },
+    { "name": "grid_scene", "value": "场景" },
+    { "name": "grid_focus", "value": "专注度" },
+    { "name": "grid_energy", "value": "能量值" },
+    { "name": "rec_title_1", "value": "深呼吸 · 森林白噪音" },
+    { "name": "rec_sub_1", "value": "放松身心，回归平静" },
+    { "name": "rec_title_2", "value": "专注学习计时器" },
+    { "name": "rec_sub_2", "value": "番茄钟 · 提升专注力" },
+    { "name": "btn_meet", "value": "去认识" },
+    { "name": "tab_home", "value": "首页" },
+    { "name": "tab_treehole", "value": "树洞" },
+    { "name": "tab_pour", "value": "倾诉" },
+    { "name": "tab_discover", "value": "发现" },
+    { "name": "tab_mine", "value": "我的" },
+    { "name": "reason_internet", "value": "用于连接服务器以提供AI情感分析与陪伴服务" }
   ]
 }

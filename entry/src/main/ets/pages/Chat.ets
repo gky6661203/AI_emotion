@@ -39,10 +39,11 @@ struct Chat {
     Column() {
       // Header
       Row() {
-        Text('<')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#333333')
+        Image($r('app.media.arrow_right'))
+          .width(24)
+          .height(24)
+          .fillColor('#333333')
+          .rotate({ angle: 180 })
           .margin({ left: 15 })
           .onClick(() => router.back())
 
@@ -136,13 +137,13 @@ struct Chat {
                 .height(22)
                 .color('#FFFFFF')
             } else {
-              Text('发送')
-                .fontSize(15)
-                .fontColor('#FFFFFF')
-                .fontWeight(FontWeight.Medium)
+              Image($r('app.media.voice'))
+                .width(22)
+                .height(22)
+                .fillColor('#FFFFFF')
             }
           }
-          .width(70)
+          .width(44)
           .height(44)
           .backgroundColor(this.inputText.length > 0 ? '#4A90D9' : '#CCCCCC')
           .borderRadius(22)

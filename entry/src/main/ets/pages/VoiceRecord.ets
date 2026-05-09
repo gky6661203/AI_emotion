@@ -29,10 +29,11 @@ struct VoiceRecordPage {
     Column() {
       // Header
       Row() {
-        Text('<')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#333333')
+        Image($r('app.media.arrow_right'))
+          .width(24)
+          .height(24)
+          .fillColor('#333333')
+          .rotate({ angle: 180 })
           .margin({ left: 15 })
           .onClick(() => router.back())
 

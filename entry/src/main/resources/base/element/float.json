@@ -1,8 +1,20 @@
 {
   "float": [
-    {
-      "name": "page_text_font_size",
-      "value": "50fp"
-    }
+    { "name": "top_text_size", "value": "36fp" },
+    { "name": "grid_item_height", "value": "96vp" },
+    { "name": "grid_radius", "value": "24vp" },
+    { "name": "icon_size", "value": "48vp" },
+    { "name": "grid_text_size", "value": "14fp" },
+    { "name": "stroke_width", "value": "8vp" },
+    { "name": "card_height", "value": "160vp" },
+    { "name": "card_radius", "value": "32vp" },
+    { "name": "shadow_blur", "value": "16vp" },
+    { "name": "shadow_offset", "value": "4vp" },
+    { "name": "img_radius", "value": "24vp" },
+    { "name": "title_size", "value": "18fp" },
+    { "name": "sub_size", "value": "14fp" },
+    { "name": "btn_height", "value": "40vp" },
+    { "name": "btn_radius", "value": "20vp" },
+    { "name": "blur_radius", "value": "20vp" }
   ]
 }

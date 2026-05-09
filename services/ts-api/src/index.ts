@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import devicesRoutes from './routes/devices';
 import chatRoutes from './routes/chat';
 import lettersRoutes from './routes/letters';
+import postsRoutes from './routes/posts';
 import voiceRoutes from './routes/voice';
 import emotionsRoutes from './routes/emotions';
 import recommendationsRoutes from './routes/recommendations';
@@ -28,6 +29,7 @@ initDatabase().then(() => {
   app.use('/api/devices', devicesRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/private-letters', lettersRoutes);
+  app.use('/api/posts', postsRoutes);
   app.use('/api/voice-records', voiceRoutes);
   app.use('/api/emotions', emotionsRoutes);
   app.use('/api/recommendations', recommendationsRoutes);

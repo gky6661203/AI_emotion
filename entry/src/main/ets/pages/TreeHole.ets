@@ -33,10 +33,11 @@ struct TreeHole {
       Column() {
         // Header
         Row() {
-          Text('<')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
+          Image($r('app.media.arrow_right'))
+            .width(24)
+            .height(24)
+            .fillColor('#333333')
+            .rotate({ angle: 180 })
             .margin({ left: 15 })
             .onClick(() => router.back())
 
@@ -48,22 +49,43 @@ struct TreeHole {
 
           Blank()
 
-          Button('写一封')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .backgroundColor('#4CAF50')
-            .borderRadius(16)
-            .height(32)
-            .margin({ right: 8 })
-            .onClick(() => this.showCreateDialog = true)
+          Button() {
+            Row() {
+              Image($r('app.media.comment'))
+                .width(16)
+                .height(16)
+                .fillColor('#FFFFFF')
+              Text(' 写一封')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#FFFFFF')
+            }
+          }
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor('#4CAF50')
+          .borderRadius(16)
+          .height(32)
+          .margin({ right: 8 })
+          .onClick(() => this.showCreateDialog = true)
 
-          Button('刷新')
-            .fontSize(14)
-            .backgroundColor('#4A90D9')
-            .borderRadius(16)
-            .height(32)
-            .margin({ right: 15 })
-            .onClick(() => this.loadLetters())
+          Button() {
+            Row() {
+              Image($r('app.media.refresh'))
+                .width(16)
+                .height(16)
+                .fillColor('#FFFFFF')
+              Text(' 刷新')
+                .fontSize(14)
+                .fontColor('#FFFFFF')
+            }
+          }
+          .fontSize(14)
+          .backgroundColor('#4A90D9')
+          .borderRadius(16)
+          .height(32)
+          .margin({ right: 15 })
+          .onClick(() => this.loadLetters())
         }
         .width('100%')
         .height(56)
