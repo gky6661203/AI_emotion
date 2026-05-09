@@ -17,7 +17,7 @@ TIMEOUT = 10
 async def test_health(client, url, name):
     try:
         response = await client.get(f"{url}/health", timeout=TIMEOUT)
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             print(f"[OK] {name} is healthy")
             return True
         else:
@@ -34,7 +34,7 @@ async def test_anonymous_user(client):
             json={"campus": "测试校区", "enrollment_year": 2024},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Anonymous user created: {data['user']['id']}")
             return data['token']
@@ -57,7 +57,7 @@ async def test_device_binding(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Device bound: {data['device']['id']}")
             return True
@@ -76,7 +76,7 @@ async def test_chat_message(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Message sent: {data['message']['id']}")
             return True
@@ -95,7 +95,7 @@ async def test_private_letter(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Letter created: {data['letter']['id']}")
             return data['letter']['id']
@@ -114,7 +114,7 @@ async def test_voice_record(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Voice record created: {data['voice_record']['id']}")
             return data['voice_record']['id']
@@ -133,7 +133,7 @@ async def test_voice_transcribe(client, token, record_id):
             json={},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             print(f"[OK] Transcription completed")
             return True
         else:
@@ -151,7 +151,7 @@ async def test_voice_analyze(client, token, record_id):
             json={},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Emotion analysis: {data['emotion']}")
             return True
@@ -169,7 +169,7 @@ async def test_recommendations(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
             print(f"[OK] Got {len(data['recommendations'])} recommendations")
             return True
@@ -187,7 +187,7 @@ async def test_emotion_report(client, token):
             headers={"Authorization": f"Bearer {token}"},
             timeout=TIMEOUT
         )
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             print(f"[OK] Emotion report generated")
             return True
         else:

@@ -8,7 +8,32 @@ struct Chat {
   @State messages: ChatMessage[] = [];
   @State inputText: string = '';
   @State isLoading: boolean = false;
+  @State lastRiskLevel: string = 'low';
   scroller: Scroller = new Scroller();
+
+  aboutToAppear() {
+    this.initAndLoadMessages();
+  }
+
+  async initAndLoadMessages() {
+    try {
+      await apiService.ensureAnonymousUser();
+      let result = await apiService.listMessages(50);
+      this.messages = result.messages;
+      if (this.messages.length === 0) {
+        this.messages = [{
+          id: '',
+          user_id: '',
+          role: 'assistant',
+          content: '你好，我在这里。你可以从一句“我今天有点累”开始。',
+          content_type: 'text',
+          created_at: new Date().toISOString()
+        }];
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
+  }
 
   build() {
     Column() {
@@ -70,6 +95,25 @@ struct Chat {
       .padding({ left: 12, right: 12, top: 10 })
       .backgroundColor('#F8F9FA')
 
+      Row() {
+        this.QuickEmotion('有点累')
+        this.QuickEmotion('很焦虑')
+        this.QuickEmotion('想被听见')
+        this.QuickEmotion('还不错')
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 8 })
+      .backgroundColor('#FFFFFF')
+
+      if (this.lastRiskLevel === 'medium' || this.lastRiskLevel === 'high' || this.lastRiskLevel === 'critical') {
+        Text('如果你正处在危险中，请优先联系身边可信任的人或当地紧急求助资源。')
+          .fontSize(12)
+          .fontColor('#D9534F')
+          .backgroundColor('#FFF3F3')
+          .padding(10)
+          .width('100%')
+      }
+
       // Input Area
       Column() {
         Row() {
@@ -112,6 +156,20 @@ struct Chat {
     }
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  QuickEmotion(text: string) {
+    Text(text)
+      .fontSize(12)
+      .fontColor('#4A90D9')
+      .backgroundColor('#E8F4FD')
+      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+      .borderRadius(14)
+      .margin({ right: 8 })
+      .onClick(() => {
+        this.inputText = text;
+      })
   }
 
   @Builder
@@ -218,6 +276,9 @@ struct Chat {
 
     try {
       let response = await apiService.sendMessage(text);
+      if (response.emotion_analysis) {
+        this.lastRiskLevel = response.emotion_analysis.risk_level;
+      }
       let lastIndex = this.messages.length - 1;
       if (lastIndex >= 0 && this.messages[lastIndex].role === 'assistant') {
         if (response.ai_response) {

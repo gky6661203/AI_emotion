@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { execute, queryOne } from '../db';
 import { User } from '../models';
+import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -42,6 +43,14 @@ router.post('/anonymous', async (req: Request, res: Response) => {
     console.error('Create anonymous user error:', error);
     res.status(500).json({ error: 'Failed to create anonymous user' });
   }
+});
+
+router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ user: req.user });
+});
+
+router.post('/logout', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ success: true });
 });
 
 export default router;

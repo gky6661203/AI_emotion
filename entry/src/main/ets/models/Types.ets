@@ -13,6 +13,17 @@ export interface User {
   deleted_at?: string;
 }
 
+export interface EmotionAnalysis {
+  emotion: string;
+  intensity: number;
+  keywords: string[];
+  response?: string;
+  summary: string;
+  risk_detected: boolean;
+  risk_level: string;
+  risk_types: string[];
+}
+
 export interface ChatMessage {
   id: string;
   user_id: string;
@@ -78,14 +89,35 @@ export interface EmotionDistributionItem {
   count: number;
 }
 
+export interface EmotionRecord {
+  id: string;
+  user_id: string;
+  emotion: string;
+  intensity: number;
+  source: string;
+  keywords?: string[];
+  risk_detected: boolean;
+  created_at: string;
+}
+
+export interface EmotionTrendItem {
+  date: string;
+  average_intensity: number;
+  count: number;
+  risk_count: number;
+}
+
 export interface EmotionReport {
   user_id: string;
-  period_start: string;
-  period_end: string;
+  period_start?: string;
+  period_end?: string;
+  date?: string;
   dominant_emotion: string;
   average_intensity: number;
   total_records: number;
   risk_events_count: number;
   emotion_distribution: EmotionDistributionItem[];
-  recent_records: object[];
+  keywords?: string[];
+  summary?: string;
+  recent_records: EmotionRecord[];
 }

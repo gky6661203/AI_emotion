@@ -1,5 +1,5 @@
 import http from '@ohos.net.http';
-import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport } from '../models/Types';
+import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport, EmotionTrendItem, EmotionAnalysis } from '../models/Types';
 
 interface Device {
   id: string;
@@ -14,13 +14,27 @@ interface CreateAnonymousResponse {
   token: string;
 }
 
+interface MeResponse {
+  user: User;
+}
+
 interface SendMessageResponse {
   message: ChatMessage;
   ai_response?: ChatMessage;
+  emotion_analysis?: EmotionAnalysis;
 }
 
-interface CreateLetterResponse {
+interface MessagesResponse {
+  messages: ChatMessage[];
+}
+
+interface LetterResponse {
   letter: PrivateLetter;
+  emotion_analysis?: EmotionAnalysis;
+}
+
+interface LettersResponse {
+  letters: PrivateLetter[];
 }
 
 interface BindDeviceResponse {
@@ -29,6 +43,10 @@ interface BindDeviceResponse {
 
 interface UploadVoiceRecordResponse {
   voice_record: VoiceRecord;
+}
+
+interface VoiceRecordsResponse {
+  voice_records: VoiceRecord[];
 }
 
 interface TranscribeVoiceResponse {
@@ -40,10 +58,22 @@ interface AnalyzeVoiceResponse {
   voice_record: VoiceRecord;
   emotion: string;
   emotion_intensity: number;
+  emotion_analysis?: EmotionAnalysis;
 }
 
 interface GetRecommendationsResponse {
   recommendations: Recommendation[];
+  dominant_emotion?: string;
+  average_intensity?: number;
+  risk_level?: string;
+}
+
+interface TrendsResponse {
+  trends: EmotionTrendItem[];
+}
+
+interface SuccessResponse {
+  success: boolean;
 }
 
 interface HttpResponseData {
@@ -66,14 +96,19 @@ interface SendMessageRequest {
   content: string;
 }
 
-interface CreateLetterRequest {
+interface SaveLetterRequest {
   content: string;
   title?: string;
+  allow_ai_analysis?: boolean;
+  write_to_emotion_profile?: boolean;
+  open_at?: string;
 }
 
 interface UploadVoiceRequest {
   file_url: string;
   duration_seconds?: number;
+  allow_ai_analysis?: boolean;
+  write_to_emotion_profile?: boolean;
 }
 
 interface EmptyRequest {
@@ -92,6 +127,19 @@ export class ApiService {
 
   getToken(): string {
     return this.token;
+  }
+
+  async ensureAnonymousUser(): Promise<User> {
+    if (this.token) {
+      try {
+        let me = await this.getMe();
+        return me.user;
+      } catch {
+        this.token = '';
+      }
+    }
+    let created = await this.createAnonymous();
+    return created.user;
   }
 
   private getHeaders(): Record<string, string> {
@@ -144,6 +192,17 @@ export class ApiService {
     return result;
   }
 
+  async getMe(): Promise<MeResponse> {
+    return this.request<MeResponse>('GET', '/api/auth/me');
+  }
+
+  async logout(): Promise<SuccessResponse> {
+    let body: EmptyRequest = {};
+    let result = await this.request<SuccessResponse>('POST', '/api/auth/logout', body);
+    this.token = '';
+    return result;
+  }
+
   async bindDevice(deviceId: string, deviceType?: string, deviceName?: string): Promise<BindDeviceResponse> {
     let body: BindDeviceRequest = {
       device_id: deviceId,
@@ -153,6 +212,10 @@ export class ApiService {
     return this.request<BindDeviceResponse>('POST', '/api/devices/bind', body);
   }
 
+  async listMessages(limit?: number): Promise<MessagesResponse> {
+    return this.request<MessagesResponse>('GET', `/api/chat/messages?limit=${limit || 50}`);
+  }
+
   async sendMessage(content: string): Promise<SendMessageResponse> {
     let body: SendMessageRequest = {
       content: content
@@ -160,29 +223,55 @@ export class ApiService {
     return this.request<SendMessageResponse>('POST', '/api/chat/messages', body);
   }
 
-  async createLetter(content: string, title?: string): Promise<CreateLetterResponse> {
-    let body: CreateLetterRequest = {
+  async listLetters(keyword?: string, emotion?: string): Promise<LettersResponse> {
+    let params: string[] = [];
+    if (keyword) params.push(`keyword=${encodeURIComponent(keyword)}`);
+    if (emotion) params.push(`emotion=${encodeURIComponent(emotion)}`);
+    let query = params.length > 0 ? `?${params.join('&')}` : '';
+    return this.request<LettersResponse>('GET', `/api/private-letters${query}`);
+  }
+
+  async createLetter(content: string, title?: string, allowAiAnalysis?: boolean, writeToProfile?: boolean): Promise<LetterResponse> {
+    let body: SaveLetterRequest = {
       content: content,
-      title: title
+      title: title,
+      allow_ai_analysis: allowAiAnalysis,
+      write_to_emotion_profile: writeToProfile
     };
-    return this.request<CreateLetterResponse>('POST', '/api/private-letters', body);
+    return this.request<LetterResponse>('POST', '/api/private-letters', body);
+  }
+
+  async updateLetter(id: string, content: string, title?: string, allowAiAnalysis?: boolean, writeToProfile?: boolean): Promise<LetterResponse> {
+    let body: SaveLetterRequest = {
+      content: content,
+      title: title,
+      allow_ai_analysis: allowAiAnalysis,
+      write_to_emotion_profile: writeToProfile
+    };
+    return this.request<LetterResponse>('PATCH', `/api/private-letters/${id}`, body);
+  }
+
+  async deleteLetter(id: string): Promise<SuccessResponse> {
+    return this.request<SuccessResponse>('DELETE', `/api/private-letters/${id}`);
   }
 
   async uploadVoiceRecord(fileUrl: string, durationSeconds?: number): Promise<UploadVoiceRecordResponse> {
     let body: UploadVoiceRequest = {
       file_url: fileUrl,
-      duration_seconds: durationSeconds
+      duration_seconds: durationSeconds,
+      allow_ai_analysis: true,
+      write_to_emotion_profile: true
     };
     return this.request<UploadVoiceRecordResponse>('POST', '/api/voice-records', body);
   }
 
+  async listVoiceRecords(limit?: number): Promise<VoiceRecordsResponse> {
+    return this.request<VoiceRecordsResponse>('GET', `/api/voice-records?limit=${limit || 50}`);
+  }
+
   async transcribeVoice(recordId: string): Promise<TranscribeVoiceResponse> {
     let body: EmptyRequest = {};
-    return this.request<TranscribeVoiceResponse>(
-      'POST',
-      `/api/voice-records/${recordId}/transcribe`,
-      body
-    );
+    return this.request<TranscribeVoiceResponse>('POST', `/api/voice-records/${recordId}/transcribe`, body);
   }
 
   async analyzeVoice(recordId: string): Promise<AnalyzeVoiceResponse> {
@@ -190,8 +279,20 @@ export class ApiService {
     return this.request<AnalyzeVoiceResponse>('POST', `/api/voice-records/${recordId}/analyze`, body);
   }
 
+  async deleteVoiceRecord(recordId: string): Promise<SuccessResponse> {
+    return this.request<SuccessResponse>('DELETE', `/api/voice-records/${recordId}`);
+  }
+
   async getRecommendations(limit?: number): Promise<GetRecommendationsResponse> {
     return this.request<GetRecommendationsResponse>('GET', `/api/recommendations/current?limit=${limit || 5}`);
+  }
+
+  async getTodayEmotion(): Promise<EmotionReport> {
+    return this.request<EmotionReport>('GET', '/api/emotions/today');
+  }
+
+  async getEmotionTrends(days?: number): Promise<TrendsResponse> {
+    return this.request<TrendsResponse>('GET', `/api/emotions/trends?days=${days || 7}`);
   }
 
   async getEmotionReport(days?: number): Promise<EmotionReport> {

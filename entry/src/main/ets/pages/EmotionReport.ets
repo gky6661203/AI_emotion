@@ -77,6 +77,7 @@ struct EmotionReportPage {
         Scroll() {
           Column() {
             this.SummaryCard()
+            this.ReportSummaryCard()
             this.EmotionDistributionCard()
             this.RecentRecordsCard()
           }
@@ -172,6 +173,40 @@ struct EmotionReportPage {
       }
       .width('100%')
       .margin({ top: 12 })
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor('#FFFFFF')
+    .borderRadius(16)
+    .shadow({
+      radius: 10,
+      color: 'rgba(0,0,0,0.06)',
+      offsetX: 0,
+      offsetY: 3
+    })
+    .margin({ bottom: 15 })
+  }
+
+  @Builder
+  ReportSummaryCard() {
+    Column() {
+      Text('支持性总结')
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#333333')
+        .alignSelf(ItemAlign.Start)
+      Text(this.report?.summary || '暂无总结')
+        .fontSize(14)
+        .fontColor('#666666')
+        .margin({ top: 10 })
+        .width('100%')
+      if (this.report?.keywords && this.report.keywords.length > 0) {
+        Text(`关键词：${this.report.keywords.join('、')}`)
+          .fontSize(13)
+          .fontColor('#4A90D9')
+          .margin({ top: 10 })
+          .width('100%')
+      }
     }
     .width('100%')
     .padding(18)

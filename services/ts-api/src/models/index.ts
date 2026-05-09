@@ -69,6 +69,9 @@ export interface PrivateLetter {
   emotion?: string;
   emotion_intensity?: number;
   write_to_emotion_profile: boolean;
+  affect_recommendation?: Record<string, unknown>;
+  affect_matching?: Record<string, unknown>;
+  open_at?: string;
   is_public: boolean;
   created_at: string;
   deleted_at?: string;
@@ -78,10 +81,14 @@ export interface VoiceRecord {
   id: string;
   user_id: string;
   file_url: string;
+  file_key?: string;
   duration_seconds?: number;
   transcript?: string;
   emotion?: string;
   emotion_intensity?: number;
+  voice_features?: Record<string, unknown>;
+  ai_summary?: string;
+  keywords?: string[];
   risk_level: string;
   transcription_status: string;
   analysis_status: string;

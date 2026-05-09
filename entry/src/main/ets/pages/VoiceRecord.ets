@@ -11,6 +11,20 @@ struct VoiceRecordPage {
   @State currentTranscript: string = '';
   @State currentEmotion: string = '';
 
+  aboutToAppear() {
+    this.loadVoiceRecords();
+  }
+
+  async loadVoiceRecords() {
+    try {
+      await apiService.ensureAnonymousUser();
+      let result = await apiService.listVoiceRecords(50);
+      this.voiceRecords = result.voice_records;
+    } catch (error) {
+      console.error('Failed to load voice records:', error);
+    }
+  }
+
   build() {
     Column() {
       // Header
@@ -260,10 +274,19 @@ struct VoiceRecordPage {
     apiService.uploadVoiceRecord(mockUrl, duration).then((result) => {
       let record = result.voice_record;
       this.voiceRecords.unshift(record);
-      this.currentTranscript = '这是一段语音转文字的内容。';
 
       if (record.id) {
-        this.analyzeRecord(record.id);
+        apiService.transcribeVoice(record.id).then((transcribeResult) => {
+          this.currentTranscript = transcribeResult.transcript;
+          let index = this.voiceRecords.findIndex(r => r.id === record.id);
+          if (index >= 0) {
+            this.voiceRecords[index] = transcribeResult.voice_record;
+          }
+          this.analyzeRecord(record.id);
+        }).catch((error: Error) => {
+          console.error('Failed to transcribe voice:', error);
+          this.analyzeRecord(record.id);
+        });
       }
     }).catch((error: Error) => {
       console.error('Failed to upload voice record:', error);
@@ -276,7 +299,7 @@ struct VoiceRecordPage {
 
       let index = this.voiceRecords.findIndex(r => r.id === recordId);
       if (index >= 0) {
-        this.voiceRecords[index].emotion = result.emotion;
+        this.voiceRecords[index] = result.voice_record;
       }
     }).catch((error: Error) => {
       console.error('Failed to analyze voice:', error);

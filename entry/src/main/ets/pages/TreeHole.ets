@@ -10,6 +10,23 @@ struct TreeHole {
   @State newTitle: string = '';
   @State newContent: string = '';
   @State isLoading: boolean = false;
+  @State keyword: string = '';
+  @State allowAiAnalysis: boolean = true;
+  @State writeToProfile: boolean = true;
+
+  aboutToAppear() {
+    this.loadLetters();
+  }
+
+  async loadLetters() {
+    try {
+      await apiService.ensureAnonymousUser();
+      let result = await apiService.listLetters(this.keyword || undefined);
+      this.letters = result.letters;
+    } catch (error) {
+      console.error('Failed to load letters:', error);
+    }
+  }
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -37,8 +54,16 @@ struct TreeHole {
             .backgroundColor('#4CAF50')
             .borderRadius(16)
             .height(32)
-            .margin({ right: 15 })
+            .margin({ right: 8 })
             .onClick(() => this.showCreateDialog = true)
+
+          Button('刷新')
+            .fontSize(14)
+            .backgroundColor('#4A90D9')
+            .borderRadius(16)
+            .height(32)
+            .margin({ right: 15 })
+            .onClick(() => this.loadLetters())
         }
         .width('100%')
         .height(56)
@@ -129,6 +154,22 @@ struct TreeHole {
               .onChange((value: string) => this.newContent = value)
 
             Row() {
+              Text('允许 AI 分析')
+                .fontSize(13)
+                .fontColor('#666666')
+              Toggle({ type: ToggleType.Switch, isOn: this.allowAiAnalysis })
+                .onChange((isOn: boolean) => this.allowAiAnalysis = isOn)
+              Blank()
+              Text('写入情绪报告')
+                .fontSize(13)
+                .fontColor('#666666')
+              Toggle({ type: ToggleType.Switch, isOn: this.writeToProfile })
+                .onChange((isOn: boolean) => this.writeToProfile = isOn)
+            }
+            .width('100%')
+            .margin({ top: 12 })
+
+            Row() {
               Button('取消')
                 .width('45%')
                 .height(48)
@@ -209,6 +250,12 @@ struct TreeHole {
         Text(letter.created_at.split('T')[0])
           .fontSize(12)
           .fontColor('#999999')
+
+        Text('删除')
+          .fontSize(12)
+          .fontColor('#F44336')
+          .margin({ left: 12 })
+          .onClick(() => this.deleteLetter(letter.id))
       }
       .margin({ top: 12 })
       .width('100%')
@@ -233,7 +280,7 @@ struct TreeHole {
     this.isLoading = true;
 
     try {
-      let result = await apiService.createLetter(this.newContent, this.newTitle || undefined);
+      let result = await apiService.createLetter(this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
       this.letters.unshift(result.letter);
       this.showCreateDialog = false;
       this.newTitle = '';
@@ -242,6 +289,15 @@ struct TreeHole {
       console.error('Failed to create letter:', error);
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  async deleteLetter(id: string) {
+    try {
+      await apiService.deleteLetter(id);
+      this.letters = this.letters.filter((letter: PrivateLetter) => letter.id !== id);
+    } catch (error) {
+      console.error('Failed to delete letter:', error);
     }
   }
 

@@ -1,430 +1,71 @@
 import router from '@ohos.router';
+import { apiService } from '../services/ApiService';
 
 @Entry
 @Component
 struct Index {
-  @State currentTab: number = 0;
-  @State userNickname: string = '同学';
-  @State recentEmotion: string = 'neutral';
-  @State greeting: string = this.getGreeting();
+  @State tab: number = 0;
+  @State emotion: string = '平静';
+  @State care: string = '检测到你最近有些疲惫，要不要试试放松一下？';
+  @State tag: number = 0;
 
-  getGreeting(): string {
-    let hour = new Date().getHours();
-    if (hour < 6) return '夜深了';
-    if (hour < 9) return '早上好';
-    if (hour < 12) return '上午好';
-    if (hour < 14) return '中午好';
-    if (hour < 18) return '下午好';
-    if (hour < 22) return '晚上好';
-    return '夜深了';
+  aboutToAppear() { this.load(); }
+
+  async load() {
+    try {
+      await apiService.ensureAnonymousUser();
+      let e = (await apiService.getTodayEmotion()).dominant_emotion || 'neutral';
+      this.emotion = e === 'happy' || e === 'joy' ? '愉悦' : e === 'sad' ? '低落' : e === 'anxious' || e === 'fear' ? '焦虑' : e === 'angry' ? '烦躁' : '平静';
+    } catch (err) { console.error('home load failed', err); }
   }
 
   build() {
     Tabs({ barPosition: BarPosition.End }) {
-      TabContent() {
-        this.HomeTab()
-      }
-      .tabBar(this.TabBarItem('首页', '🏠', 0))
-
-      TabContent() {
-        this.ChatTab()
-      }
-      .tabBar(this.TabBarItem('聊天', '💬', 1))
-
-      TabContent() {
-        this.TreeHoleTab()
-      }
-      .tabBar(this.TabBarItem('树洞', '📮', 2))
-
-      TabContent() {
-        this.VoiceTab()
-      }
-      .tabBar(this.TabBarItem('语音', '🎤', 3))
-
-      TabContent() {
-        this.SettingsTab()
-      }
-      .tabBar(this.TabBarItem('设置', '⚙️', 4))
-    }
-    .barHeight(65)
-    .barBackgroundColor('#FFFFFF')
-    .onChange((index) => {
-      this.currentTab = index;
-    })
+      TabContent() { this.Home() }.tabBar(this.Tab('首页', '⌂', 0))
+      TabContent() { this.Page('树洞', '这里是只属于你的私密空间', '进入树洞', 'pages/TreeHole') }.tabBar(this.Tab('树洞', '···', 1))
+      TabContent() { this.Page('倾诉', '选择一种舒服的方式，把此刻说出来', '开始 AI 陪伴', 'pages/Chat') }.tabBar(this.MidTab())
+      TabContent() { this.Page('发现', '情绪报告、成长记录和个性化推荐', '查看报告', 'pages/EmotionReport') }.tabBar(this.Tab('发现', '◇', 3))
+      TabContent() { this.Me() }.tabBar(this.Tab('我的', '○', 4))
+    }.barHeight(68).barBackgroundColor('#FFFFFF').backgroundColor('#F7F4FF').onChange((i: number) => { this.tab = i; })
   }
 
-  @Builder
-  TabBarItem(title: string, icon: string, index: number) {
+  @Builder Tab(t: string, i: string, n: number) { Column() { Text(i).fontSize(21).fontColor(this.tab === n ? '#7658F6' : '#8B8A99'); Text(t).fontSize(10).fontColor(this.tab === n ? '#7658F6' : '#8B8A99') }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center) }
+  @Builder MidTab() { Column() { Column() { Text('∥').fontSize(24).fontColor('#FFF').fontWeight(FontWeight.Bold) }.width(56).height(56).borderRadius(28).backgroundColor('#7B57FF').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).shadow({ radius: 18, color: '#7B57FF55', offsetY: 6 }); Text('倾诉').fontSize(10).fontColor('#7658F6').fontWeight(FontWeight.Bold) }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center) }
+
+  @Builder Home() {
+    Scroll() { Column() { this.Head(); this.Hero(); this.Status(); this.Recommend(); this.Buddies(); this.Device(); Text('陪伴而不诊断，引导而不治疗').fontSize(11).fontColor('#B9B5C8').margin({ top: 16, bottom: 18 }) }.width('100%').constraintSize({ maxWidth: 760 }).padding({ left: 12, right: 12, top: 8 }).alignItems(HorizontalAlign.Center) }.width('100%').height('100%').backgroundColor('#F7F4FF')
+  }
+
+  @Builder Head() {
     Column() {
-      Text(icon)
-        .fontSize(20)
-        .fontColor(this.currentTab === index ? '#4A90D9' : '#999999')
-      Text(title)
-        .fontSize(10)
-        .fontColor(this.currentTab === index ? '#4A90D9' : '#999999')
-        .margin({ top: 4 })
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
+      Row() { Text('09:30').fontSize(12); Blank(); Text('⌁  ◇  100%').fontSize(11) }.width('100%').height(18)
+      Row() { Stack() { Circle().width(42).height(42).fill('#7A62FF'); Circle().width(18).height(18).fill('#FFFFFF99') }.width(46); Column() { Text('树洞').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#19162B'); Text('OpenHarmony').fontSize(8).fontColor('#FFF').padding({ left: 6, right: 6 }).backgroundColor('#7D8DFF').borderRadius(7) }.alignItems(HorizontalAlign.Start); Blank(); Text('首页').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#171329').padding({ bottom: 6 }).border({ width: { bottom: 3 }, color: '#7762F4' }); Blank(); Text('▱ 多设备已连接  ⌕').fontSize(12).fontColor('#2C2940') }.width('100%').height(62).alignItems(VerticalAlign.Center)
+    }.width('100%')
   }
 
-  @Builder
-  HomeTab() {
-    Column() {
-      // Header
-      Row() {
-        Column() {
-          Text('校园树洞')
-            .fontSize(26)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
-          Text(this.greeting)
-            .fontSize(14)
-            .fontColor('#999999')
-            .margin({ top: 4 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .margin({ left: 20, top: 15 })
-
-        Blank()
-
-        // Avatar placeholder
-        Circle()
-          .width(44)
-          .height(44)
-          .fill('#E8F4FD')
-          .margin({ right: 20 })
-          .stroke('#4A90D9')
-          .strokeWidth(2)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      // Welcome Card
-      Column() {
-        Row() {
-          Column() {
-            Text(`${this.greeting}，${this.userNickname}`)
-              .fontSize(20)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#FFFFFF')
-            Text('今天感觉怎么样？')
-              .fontSize(14)
-              .fontColor('rgba(255,255,255,0.85)')
-              .margin({ top: 6 })
-          }
-
-          Blank()
-
-          Text('🌟')
-            .fontSize(36)
-        }
-        .width('100%')
-        .padding(20)
-      }
-      .width('93%')
-      .height(120)
-      .backgroundColor('#4A90D9')
-      .borderRadius(16)
-      .shadow({
-        radius: 12,
-        color: 'rgba(74,144,217,0.25)',
-        offsetX: 0,
-        offsetY: 4
-      })
-      .margin({ top: 15 })
-
-      // Quick Entry Section
-      Column() {
-        Text('快捷入口')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#333333')
-          .alignSelf(ItemAlign.Start)
-          .margin({ left: 20, top: 25, bottom: 15 })
-
-        Column() {
-          Row() {
-            this.QuickEntry('AI 聊天', '💬', '#4A90D9', () => router.pushUrl({ url: 'pages/Chat' }))
-            this.QuickEntry('私密树洞', '📮', '#4CAF50', () => router.pushUrl({ url: 'pages/TreeHole' }))
-            this.QuickEntry('语音记录', '🎤', '#FF6B6B', () => router.pushUrl({ url: 'pages/VoiceRecord' }))
-            this.QuickEntry('情绪报告', '📊', '#FF9500', () => router.pushUrl({ url: 'pages/EmotionReport' }))
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.SpaceEvenly)
-        }
-        .width('93%')
-      }
-
-      Blank()
-
-      // Bottom tip
-      Text('陪伴而不诊断，引导而不治疗')
-        .fontSize(12)
-        .fontColor('#CCCCCC')
-        .margin({ bottom: 20 })
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#F8F9FA')
+  @Builder Hero() {
+    Stack() { Row() { Column() { Text('Hi~ 这里是你的树洞🌿').fontSize(24).fontWeight(FontWeight.Bold).fontColor('#17112D').maxLines(1); Text('倾听你的情绪，陪伴你的每一刻').fontSize(13).fontColor('#77708B').margin({ top: 8 }); Row() { this.Pill('无压力倾诉'); this.Pill('AI共情陪伴'); this.Pill('隐私安全守护') }.margin({ top: 14 }); Row() { Text('···').fontSize(18).fontColor('#7654F8').margin({ right: 8 }); Column() { Text('想说点什么吗？').fontSize(14).fontColor('#FFF').fontWeight(FontWeight.Bold); Text('点击开始倾诉...').fontSize(10).fontColor('#E7DEFF') }.alignItems(HorizontalAlign.Start); Blank(); Text('›').fontSize(28).fontColor('#FFF') }.height(58).width('90%').padding({ left: 14, right: 12 }).backgroundColor('#8061F8').borderRadius(16).margin({ top: 18 }).onClick(() => router.pushUrl({ url: 'pages/Chat' })) }.width('60%').padding({ left: 24, top: 26 }).alignItems(HorizontalAlign.Start); Blank(); this.Tree() }.height('100%'); Text('我在这里\n一直陪着你').fontSize(11).fontColor('#FFF').textAlign(TextAlign.Center).padding(10).backgroundColor('#5A436688').borderRadius(18).position({ x: '76%', y: 52 }) }.height(258).width('100%').backgroundColor('#ECE7FF').borderRadius(18).clip(true).shadow({ radius: 14, color: '#9B8FEA22', offsetY: 6 })
   }
 
-  @Builder
-  QuickEntry(title: string, emoji: string, color: string, callback: () => void) {
-    Column() {
-      Column() {
-        Text(emoji)
-          .fontSize(26)
-      }
-      .width(56)
-      .height(56)
-      .backgroundColor(color)
-      .borderRadius(16)
-      .justifyContent(FlexAlign.Center)
-      .shadow({
-        radius: 8,
-        color: color + '40',
-        offsetX: 0,
-        offsetY: 3
-      })
+  @Builder Pill(t: string) { Text(t).fontSize(10).fontColor('#837A9A').padding({ left: 10, right: 10, top: 6, bottom: 6 }).backgroundColor('#F5F1FF').borderRadius(12).margin({ right: 7 }) }
+  @Builder Tree() { Stack() { Rect().width('100%').height('100%').fill('#A6B4FF'); Circle().width(150).height(108).fill('#285F50').position({ x: 20, y: 20 }); Circle().width(112).height(92).fill('#2F735C').position({ x: 88, y: 42 }); Rect().width(54).height(132).fill('#725034').borderRadius(28).position({ x: 82, y: 106 }); Circle().width(82).height(82).fill('#FFF2B8').position({ x: 68, y: 110 }); Text('⌒  ⌒').fontSize(16).fontColor('#5B4C36').position({ x: 90, y: 142 }); Circle().width(7).height(7).fill('#FFE978').position({ x: 36, y: 92 }); Circle().width(6).height(6).fill('#FFE978').position({ x: 166, y: 62 }) }.width('40%').height('100%').clip(true) }
 
-      Text(title)
-        .fontSize(12)
-        .fontColor('#666666')
-        .margin({ top: 8 })
-    }
-    .width(70)
-    .alignItems(HorizontalAlign.Center)
-    .onClick(callback)
-  }
+  @Builder Status() { GridRow({ columns: 12, gutter: { x: 10, y: 10 } }) { GridCol({ span: { xs: 12, sm: 8 } }) { this.StateCard() }; GridCol({ span: { xs: 12, sm: 4 } }) { this.Care() } }.width('100%').margin({ top: 12 }) }
+  @Builder StateCard() { Column() { Row() { Text('✺ 当前状态').fontSize(14).fontWeight(FontWeight.Bold).fontColor('#2D2840'); Text(' · 更新于 09:30').fontSize(10).fontColor('#9B96AC'); Blank() }.width('100%'); Row() { this.Metric('☺', '情绪', this.emotion, '76分', '#FFE6A7'); this.Line(); this.Metric('⌂', '场景', '居家', '晚上', '#DED9FF'); this.Line(); this.Focus(); this.Line(); this.Metric('▯', '能量值', '82%', '', '#DDF7E3') }.height(104).width('100%') }.padding(14).width('100%').backgroundColor('#FFF').borderRadius(18).shadow({ radius: 12, color: '#8B7ED622', offsetY: 4 }) }
+  @Builder Metric(i: string, l: string, t: string, s: string, c: string) { Column() { Text(i).fontSize(28).fontColor('#6C5CE7').width(42).height(42).textAlign(TextAlign.Center).backgroundColor(c).borderRadius(21); Text(l).fontSize(10).fontColor('#918AA3'); Text(t).fontSize(16).fontWeight(FontWeight.Bold).fontColor('#19162B'); Text(s).fontSize(13).fontColor('#7C768D') }.layoutWeight(1).alignItems(HorizontalAlign.Center) }
+  @Builder Focus() { Column() { Text('专注度').fontSize(10).fontColor('#918AA3'); Stack() { Progress({ value: 68, total: 100, type: ProgressType.Ring }).width(54).height(54).color('#7FD9AE').backgroundColor('#EEEAF8'); Text('68%').fontSize(13).fontColor('#776F88') }.margin({ top: 7 }) }.layoutWeight(1).alignItems(HorizontalAlign.Center) }
+  @Builder Line() { Divider().vertical(true).height(72).color('#EEEAF8').strokeWidth(1) }
+  @Builder Care() { Stack({ alignContent: Alignment.BottomEnd }) { Column() { Row() { Text('✈ 主动关怀').fontSize(14).fontWeight(FontWeight.Bold).fontColor('#30294B'); Text('NEW').fontSize(8).fontColor('#FFF').padding({ left: 5, right: 5 }).backgroundColor('#7B59FF').borderRadius(8).margin({ left: 6 }); Blank() }; Text(this.care).fontSize(11).fontColor('#60596F').lineHeight(18).width('72%').margin({ top: 12 }); Button('聊一聊').width(84).height(28).fontSize(11).fontColor('#7860E9').backgroundColor('#FFF').borderRadius(14).margin({ top: 10 }).onClick(() => { this.care = '我在这里，先做三次深呼吸，再慢慢告诉我发生了什么。'; }) }.padding(14).width('100%').height('100%').alignItems(HorizontalAlign.Start); Stack() { Circle().width(84).height(84).fill('#E2D9FF'); Rect().width(46).height(30).fill('#111B35').borderRadius(16); Text('• •').fontSize(16).fontColor('#5CF5FF') }.width(96).height(96).margin({ right: 2, bottom: 4 }) }.height(156).width('100%').backgroundColor('#F0E9FF').borderRadius(18).clip(true) }
 
-  @Builder
-  ChatTab() {
-    Column() {
-      Stack({ alignContent: Alignment.Top }) {
-        Column() {
-          Text('AI 陪伴')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
-            .margin({ top: 15, bottom: 20 })
-        }
-        .width('100%')
-      }
-      .width('100%')
+  @Builder Recommend() { Column() { Row() { Text('为你推荐').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#201B34'); Blank(); Text('换一换 ↻').fontSize(11).fontColor('#756F86').onClick(() => { this.tag = (this.tag + 1) % 4; }) }.margin({ top: 18, bottom: 10 }).width('100%'); Row() { this.Tag('治愈时刻', 0); this.Tag('学习提升', 1); this.Tag('轻松娱乐', 2); this.Tag('成长记录', 3) }.justifyContent(FlexAlign.Center).margin({ bottom: 10 }).width('100%'); GridRow({ columns: 12, gutter: { x: 10, y: 10 } }) { GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('深呼吸 · 森林白噪音', '放松身心，回归平静', '08:45', '#7FA36B') }; GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('专注学习计时器', '番茄钟 · 提升专注力', '25:00', '#C8B28C') }; GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('今日快乐小视频', '治愈瞬间，好心情', '05:12', '#C9A391') }; GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('睡前减压冥想', '释放压力，安然入眠', '03:21', '#6D74B8') } }.width('100%') }.width('100%') }
+  @Builder Tag(t: string, i: number) { Text(t).fontSize(11).fontColor(this.tag === i ? '#7B60EA' : '#8F89A0').padding({ left: 12, right: 12, top: 6, bottom: 6 }).backgroundColor(this.tag === i ? '#EEE8FF' : '#F7F4FF').borderRadius(13).margin({ right: 8 }).onClick(() => { this.tag = i; }) }
+  @Builder Rec(t: string, d: string, time: string, c: string) { Column() { Stack() { Rect().width('100%').height(92).fill(c).opacity(0.28); Circle().width(90).height(90).fill(c).opacity(0.45); Text('▶').fontSize(24).fontColor('#FFF'); Text(time).fontSize(9).fontColor('#FFF').backgroundColor('#00000066').borderRadius(5).padding({ left: 5, right: 5 }).position({ x: '66%', y: 72 }) }.height(92).width('100%'); Column() { Text(t).fontSize(12).fontWeight(FontWeight.Bold).fontColor('#272137').maxLines(1); Text(d).fontSize(9).fontColor('#8C8597').maxLines(1).margin({ top: 4 }); Text('治愈').fontSize(9).fontColor(c).margin({ top: 8 }) }.padding(9).alignItems(HorizontalAlign.Start) }.height(170).width('100%').backgroundColor('#FFF').borderRadius(12).clip(true).shadow({ radius: 10, color: '#8B7ED618', offsetY: 4 }) }
 
-      Column() {
-        Column() {
-          Text('💬')
-            .fontSize(70)
-            .margin({ top: 60 })
-          Text('随时在这里倾听你')
-            .fontSize(16)
-            .fontColor('#666666')
-            .margin({ top: 15 })
-          Text('分享你的想法，我会用心回应')
-            .fontSize(13)
-            .fontColor('#999999')
-            .margin({ top: 6 })
-        }
-        .layoutWeight(1)
+  @Builder Buddies() { Column() { Row() { Text('为你推荐搭子').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#201B34'); Blank(); Text('›').fontSize(24).fontColor('#7E778E') }.width('100%').margin({ top: 18, bottom: 10 }); Row() { this.Buddy('小夏同学', '4.9', '#F5CFCF'); this.Buddy('阿杰', '4.8', '#D5C6AE'); this.Buddy('鹿鹿酱', '4.9', '#F6D8E7'); this.Buddy('星星', '4.7', '#DCD2FF') }.width('100%') }.width('100%') }
+  @Builder Buddy(n: string, s: string, c: string) { Column() { Circle().width(48).height(48).fill(c); Text(n).fontSize(12).fontWeight(FontWeight.Bold).fontColor('#2A2439'); Text(`★ ${s}`).fontSize(10).fontColor('#D9AA35'); Button('去认识').height(28).width('82%').fontSize(11).fontColor('#FFF').backgroundColor('#7658F6').borderRadius(14).margin({ top: 8 }) }.layoutWeight(1).height(128).backgroundColor('#FFF').borderRadius(13).padding({ top: 10, left: 5, right: 5 }).alignItems(HorizontalAlign.Center).margin({ right: 8 }) }
+  @Builder Device() { Column() { Text('多设备同步').fontSize(15).fontWeight(FontWeight.Bold).fontColor('#201B34'); Text('手机树洞内容已同步至平板、手表、智慧屏等设备').fontSize(11).fontColor('#7E788F').margin({ top: 10 }); Button('查看设备 ›').height(30).fontSize(11).fontColor('#7257E8').backgroundColor('#F6F2FF').borderRadius(15).margin({ top: 12 }) }.width('100%').padding(16).backgroundColor('#FFF').borderRadius(18).margin({ top: 10 }).shadow({ radius: 12, color: '#8B7ED622', offsetY: 4 }) }
 
-        Button('开始聊天')
-          .width(200)
-          .height(48)
-          .backgroundColor('#4A90D9')
-          .borderRadius(24)
-          .fontColor('#FFFFFF')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 80 })
-          .shadow({
-            radius: 12,
-            color: 'rgba(74,144,217,0.3)',
-            offsetX: 0,
-            offsetY: 4
-          })
-          .onClick(() => router.pushUrl({ url: 'pages/Chat' }))
-      }
-      .width('100%')
-      .height('100%')
-      .backgroundColor('#FFFFFF')
-    }
-  }
-
-  @Builder
-  TreeHoleTab() {
-    Column() {
-      Text('私密树洞')
-        .fontSize(22)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#333333')
-        .margin({ top: 15, bottom: 20 })
-
-      Column() {
-        Column() {
-          Text('📮')
-            .fontSize(70)
-            .margin({ top: 60 })
-          Text('写下你的心事')
-            .fontSize(16)
-            .fontColor('#666666')
-            .margin({ top: 15 })
-          Text('这里是你私密的空间')
-            .fontSize(13)
-            .fontColor('#999999')
-            .margin({ top: 6 })
-        }
-        .layoutWeight(1)
-
-        Button('创建树洞')
-          .width(200)
-          .height(48)
-          .backgroundColor('#4CAF50')
-          .borderRadius(24)
-          .fontColor('#FFFFFF')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 80 })
-          .shadow({
-            radius: 12,
-            color: 'rgba(76,175,80,0.3)',
-            offsetX: 0,
-            offsetY: 4
-          })
-          .onClick(() => router.pushUrl({ url: 'pages/TreeHole' }))
-      }
-      .width('100%')
-      .height('100%')
-      .backgroundColor('#FFFFFF')
-    }
-  }
-
-  @Builder
-  VoiceTab() {
-    Column() {
-      Text('语音记录')
-        .fontSize(22)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#333333')
-        .margin({ top: 15, bottom: 20 })
-
-      Column() {
-        Column() {
-          Text('🎤')
-            .fontSize(70)
-            .margin({ top: 60 })
-          Text('说出你的感受')
-            .fontSize(16)
-            .fontColor('#666666')
-            .margin({ top: 15 })
-          Text('用声音记录此刻的心情')
-            .fontSize(13)
-            .fontColor('#999999')
-            .margin({ top: 6 })
-        }
-        .layoutWeight(1)
-
-        Button('开始录音')
-          .width(200)
-          .height(48)
-          .backgroundColor('#FF6B6B')
-          .borderRadius(24)
-          .fontColor('#FFFFFF')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 80 })
-          .shadow({
-            radius: 12,
-            color: 'rgba(255,107,107,0.3)',
-            offsetX: 0,
-            offsetY: 4
-          })
-          .onClick(() => router.pushUrl({ url: 'pages/VoiceRecord' }))
-      }
-      .width('100%')
-      .height('100%')
-      .backgroundColor('#FFFFFF')
-    }
-  }
-
-  @Builder
-  SettingsTab() {
-    Column() {
-      Text('设置')
-        .fontSize(22)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#333333')
-        .margin({ top: 15, bottom: 20 })
-
-      List() {
-        ListItem() {
-          Row() {
-            Text('👤')
-              .fontSize(20)
-              .margin({ right: 12 })
-            Text('设备管理')
-              .fontSize(16)
-              .fontColor('#333333')
-            Blank()
-            Text('>')
-              .fontSize(16)
-              .fontColor('#CCCCCC')
-          }
-          .width('100%')
-          .padding(16)
-        }
-        .backgroundColor('#FFFFFF')
-        .borderRadius(12)
-        .margin({ left: 15, right: 15, bottom: 10 })
-
-        ListItem() {
-          Row() {
-            Text('🔒')
-              .fontSize(20)
-              .margin({ right: 12 })
-            Text('隐私设置')
-              .fontSize(16)
-              .fontColor('#333333')
-            Blank()
-            Text('>')
-              .fontSize(16)
-              .fontColor('#CCCCCC')
-          }
-          .width('100%')
-          .padding(16)
-        }
-        .backgroundColor('#FFFFFF')
-        .borderRadius(12)
-        .margin({ left: 15, right: 15, bottom: 10 })
-
-        ListItem() {
-          Row() {
-            Text('ℹ️')
-              .fontSize(20)
-              .margin({ right: 12 })
-            Text('关于我们')
-              .fontSize(16)
-              .fontColor('#333333')
-            Blank()
-            Text('>')
-              .fontSize(16)
-              .fontColor('#CCCCCC')
-          }
-          .width('100%')
-          .padding(16)
-        }
-        .backgroundColor('#FFFFFF')
-        .borderRadius(12)
-        .margin({ left: 15, right: 15, bottom: 10 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .backgroundColor('#F8F9FA')
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#F8F9FA')
-  }
+  @Builder Page(t: string, d: string, b: string, u: string) { Column() { Text(t).fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 38, bottom: 20 }); Text(d).fontSize(13).fontColor('#8B849B'); Button(b).width(210).height(48).fontSize(16).fontColor('#FFF').backgroundColor('#7658F6').borderRadius(24).margin({ top: 40 }).onClick(() => router.pushUrl({ url: u })) }.width('100%').height('100%').backgroundColor('#F7F4FF').alignItems(HorizontalAlign.Center) }
+  @Builder Me() { Column() { Text('我的').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 38, bottom: 20 }); this.Setting('多设备管理', '▱'); this.Setting('隐私安全守护', '◇'); this.Setting('关于树洞', '○') }.width('100%').height('100%').padding({ left: 18, right: 18 }).backgroundColor('#F7F4FF') }
+  @Builder Setting(t: string, i: string) { Row() { Text(i).fontSize(20).fontColor('#7658F6').margin({ right: 12 }); Text(t).fontSize(16).fontColor('#30294B'); Blank(); Text('›').fontSize(24).fontColor('#A9A2B8') }.width('100%').height(58).padding({ left: 16, right: 16 }).backgroundColor('#FFF').borderRadius(16).margin({ bottom: 12 }) }
 }
