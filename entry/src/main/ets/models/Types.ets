@@ -1,6 +1,8 @@
 export interface User {
   id: string;
   anonymous_token: string;
+  email?: string;
+  account_status?: string;
   nickname?: string;
   avatar_url?: string;
   campus?: string;
@@ -52,6 +54,29 @@ export interface PrivateLetter {
   open_at?: string;
   is_public: boolean;
   created_at: string;
+  deleted_at?: string;
+}
+
+export interface PublicPost {
+  id: string;
+  user_id: string;
+  anonymous_profile_id?: string;
+  title?: string;
+  content: string;
+  topic?: string;
+  allow_comments: boolean;
+  link_match_request: boolean;
+  ai_summary?: string;
+  keywords?: string[];
+  emotion?: string;
+  emotion_intensity?: number;
+  risk_level: string;
+  moderation_status: string;
+  reaction_counts?: object;
+  author_display_name?: string;
+  author_avatar_url?: string;
+  created_at: string;
+  updated_at: string;
   deleted_at?: string;
 }
 
@@ -122,12 +147,40 @@ export interface EmotionReport {
   recent_records: EmotionRecord[];
 }
 
+export interface AnonymousProfile {
+  id: string;
+  user_id: string;
+  display_name: string;
+  avatar_url?: string;
+  bio?: string;
+  interests?: string[];
+  campus?: string;
+  enrollment_year?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPrivacySettings {
+  user_id: string;
+  allow_chat_analysis: boolean;
+  allow_letter_analysis: boolean;
+  allow_voice_analysis: boolean;
+  allow_profile_update: boolean;
+  allow_recommendation_use: boolean;
+  allow_match_use: boolean;
+  allow_voice_text_retention: boolean;
+  allow_multi_device_sync: boolean;
+  allow_emotion_reminders: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PostsResponse {
-  posts: PrivateLetter[];
+  posts: PublicPost[];
 }
 
 export interface PostResponse {
-  post: PrivateLetter;
+  post: PublicPost;
 }
 
 export interface VoiceRecordsResponse {

@@ -1,5 +1,5 @@
 import http from '@ohos.net.http';
-import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport, EmotionTrendItem, EmotionAnalysis, PostsResponse, PostResponse, SuccessResponse } from '../models/Types';
+import { User, ChatMessage, PrivateLetter, VoiceRecord, Recommendation, EmotionReport, EmotionTrendItem, EmotionAnalysis, PostsResponse, PostResponse, SuccessResponse, AnonymousProfile, UserPrivacySettings } from '../models/Types';
 
 interface Device {
   id: string;
@@ -12,6 +12,19 @@ interface Device {
 interface CreateAnonymousResponse {
   user: User;
   token: string;
+}
+
+interface AuthResponse {
+  user: User;
+  token: string;
+}
+
+interface AnonymousProfileResponse {
+  profile: AnonymousProfile;
+}
+
+interface PrivacySettingsResponse {
+  settings: UserPrivacySettings;
 }
 
 interface MeResponse {
@@ -82,6 +95,40 @@ interface AnonymousRequest {
   enrollment_year?: number;
 }
 
+interface RegisterRequest {
+  account: string;
+  password: string;
+  nickname?: string;
+  campus?: string;
+  enrollment_year?: number;
+}
+
+interface LoginRequest {
+  account: string;
+  password: string;
+}
+
+interface UpdateAnonymousProfileRequest {
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  interests?: string[];
+  campus?: string;
+  enrollment_year?: number;
+}
+
+interface UpdatePrivacySettingsRequest {
+  allow_chat_analysis?: boolean;
+  allow_letter_analysis?: boolean;
+  allow_voice_analysis?: boolean;
+  allow_profile_update?: boolean;
+  allow_recommendation_use?: boolean;
+  allow_match_use?: boolean;
+  allow_voice_text_retention?: boolean;
+  allow_multi_device_sync?: boolean;
+  allow_emotion_reminders?: boolean;
+}
+
 interface BindDeviceRequest {
   device_id: string;
   device_type?: string;
@@ -120,12 +167,12 @@ interface AddReactionRequest {
   type: string;
 }
 
-const BASE_URL = 'http://localhost:8080';
+const DEFAULT_BASE_URL = 'http://172.26.48.1:8080';
 const TIMEOUT = 30000;
 
 export class ApiService {
   private token: string = '';
-  private baseUrl: string = BASE_URL;
+  private baseUrl: string = DEFAULT_BASE_URL;
 
   setToken(token: string): void {
     this.token = token;
@@ -133,6 +180,19 @@ export class ApiService {
 
   getToken(): string {
     return this.token;
+  }
+
+  setBaseUrl(baseUrl: string): void {
+    let value = baseUrl.trim();
+    if (!value) {
+      this.baseUrl = DEFAULT_BASE_URL;
+      return;
+    }
+    this.baseUrl = value.replace(/\/$/, '');
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   async ensureAnonymousUser(): Promise<User> {
@@ -173,7 +233,14 @@ export class ApiService {
 
     let httpResponse = response as HttpResponseData;
     if (httpResponse.responseCode !== 200 && httpResponse.responseCode !== 201) {
-      throw new Error(`HTTP ${httpResponse.responseCode}`);
+      let detail = '';
+      try {
+        let parsed = JSON.parse(httpResponse.result as string) as Record<string, string>;
+        detail = parsed.detail ? `: ${parsed.detail}` : '';
+      } catch {
+        detail = '';
+      }
+      throw new Error(`HTTP ${httpResponse.responseCode}${detail}`);
     }
 
     return JSON.parse(httpResponse.result as string) as T;
@@ -202,6 +269,41 @@ export class ApiService {
     return this.request<MeResponse>('GET', '/api/auth/me');
   }
 
+  async register(account: string, password: string, nickname?: string, campus?: string, enrollmentYear?: number): Promise<AuthResponse> {
+    let body: RegisterRequest = { account: account, password: password, nickname: nickname, campus: campus, enrollment_year: enrollmentYear };
+    let result = await this.request<AuthResponse>('POST', '/api/auth/register', body);
+    this.token = result.token;
+    return result;
+  }
+
+  async login(account: string, password: string): Promise<AuthResponse> {
+    let body: LoginRequest = { account: account, password: password };
+    let result = await this.request<AuthResponse>('POST', '/api/auth/login', body);
+    this.token = result.token;
+    return result;
+  }
+
+  async getAnonymousProfile(): Promise<AnonymousProfileResponse> {
+    return this.request<AnonymousProfileResponse>('GET', '/api/anonymous-profile');
+  }
+
+  async updateAnonymousProfile(displayName: string, bio?: string, campus?: string): Promise<AnonymousProfileResponse> {
+    let body: UpdateAnonymousProfileRequest = { display_name: displayName, bio: bio, campus: campus };
+    return this.request<AnonymousProfileResponse>('PATCH', '/api/anonymous-profile', body);
+  }
+
+  async randomizeAnonymousProfile(): Promise<AnonymousProfileResponse> {
+    let body: EmptyRequest = {};
+    return this.request<AnonymousProfileResponse>('POST', '/api/anonymous-profile/randomize', body);
+  }
+
+  async getPrivacySettings(): Promise<PrivacySettingsResponse> {
+    return this.request<PrivacySettingsResponse>('GET', '/api/privacy-settings');
+  }
+
+  async updatePrivacySettings(settings: UpdatePrivacySettingsRequest): Promise<PrivacySettingsResponse> {
+    return this.request<PrivacySettingsResponse>('PATCH', '/api/privacy-settings', settings);
+  }
   async logout(): Promise<SuccessResponse> {
     let body: EmptyRequest = {};
     let result = await this.request<SuccessResponse>('POST', '/api/auth/logout', body);
@@ -328,3 +430,4 @@ export class ApiService {
 }
 
 export let apiService = new ApiService();
+

@@ -1,4 +1,5 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
 import { PrivateLetter } from '../models/Types';
 import { apiService } from '../services/ApiService';
 
@@ -6,13 +7,13 @@ import { apiService } from '../services/ApiService';
 @Component
 struct TreeHole {
   @State letters: PrivateLetter[] = [];
-  @State showCreateDialog: boolean = false;
   @State newTitle: string = '';
   @State newContent: string = '';
   @State isLoading: boolean = false;
   @State keyword: string = '';
   @State allowAiAnalysis: boolean = true;
   @State writeToProfile: boolean = true;
+  @State statusText: string = '还没有树洞';
 
   aboutToAppear() {
     this.loadLetters();
@@ -23,139 +24,58 @@ struct TreeHole {
       await apiService.ensureAnonymousUser();
       let result = await apiService.listLetters(this.keyword || undefined);
       this.letters = result.letters;
+      this.statusText = this.letters.length > 0 ? `已加载 ${this.letters.length} 封树洞` : '还没有树洞';
     } catch (error) {
+      this.statusText = '加载失败，请检查后端是否启动';
       console.error('Failed to load letters:', error);
     }
   }
 
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column() {
-        // Header
-        Row() {
-          Image($r('app.media.arrow_right'))
-            .width(24)
-            .height(24)
-            .fillColor('#333333')
-            .rotate({ angle: 180 })
-            .margin({ left: 15 })
-            .onClick(() => router.back())
+    Column() {
+      Row() {
+        Image($r('app.media.arrow_right'))
+          .width(24)
+          .height(24)
+          .fillColor('#333333')
+          .rotate({ angle: 180 })
+          .margin({ left: 15 })
+          .onClick(() => router.back())
 
-          Text('私密树洞')
-            .fontSize(18)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#333333')
-            .margin({ left: 10 })
-
-          Blank()
-
-          Button() {
-            Row() {
-              Image($r('app.media.comment'))
-                .width(16)
-                .height(16)
-                .fillColor('#FFFFFF')
-              Text(' 写一封')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#FFFFFF')
-            }
-          }
-          .fontSize(14)
+        Text('私密树洞')
+          .fontSize(18)
           .fontWeight(FontWeight.Medium)
-          .backgroundColor('#4CAF50')
-          .borderRadius(16)
-          .height(32)
-          .margin({ right: 8 })
-          .onClick(() => this.showCreateDialog = true)
+          .fontColor('#333333')
+          .margin({ left: 10 })
 
-          Button() {
-            Row() {
-              Image($r('app.media.refresh'))
-                .width(16)
-                .height(16)
-                .fillColor('#FFFFFF')
-              Text(' 刷新')
-                .fontSize(14)
-                .fontColor('#FFFFFF')
-            }
-          }
-          .fontSize(14)
+        Blank()
+
+        Button('刷新')
+          .height(32)
           .backgroundColor('#4A90D9')
+          .fontColor('#FFFFFF')
           .borderRadius(16)
-          .height(32)
           .margin({ right: 15 })
-          .onClick(() => this.loadLetters())
-        }
-        .width('100%')
-        .height(56)
-        .backgroundColor('#FFFFFF')
-        .shadow({
-          radius: 4,
-          color: 'rgba(0,0,0,0.05)',
-          offsetY: 2
-        })
-
-        if (this.letters.length === 0) {
-          Column() {
-            Column() {
-              Text('📮')
-                .fontSize(70)
-                .margin({ top: 80 })
-              Text('还没有树洞')
-                .fontSize(18)
-                .fontColor('#666666')
-                .fontWeight(FontWeight.Medium)
-                .margin({ top: 20 })
-              Text('写下你的第一个心事吧')
-                .fontSize(14)
-                .fontColor('#999999')
-                .margin({ top: 8 })
-            }
-            .layoutWeight(1)
-          }
-          .width('100%')
-          .backgroundColor('#F8F9FA')
-        } else {
-          List() {
-            ForEach(this.letters, (letter: PrivateLetter) => {
-              ListItem() {
-                this.LetterCard(letter)
-              }
-            })
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .padding({ left: 15, right: 15, top: 12 })
-          .backgroundColor('#F8F9FA')
-        }
+          .onClick(() => {
+            this.statusText = '正在刷新树洞...';
+            this.loadLetters();
+          })
       }
       .width('100%')
-      .height('100%')
+      .height(56)
       .backgroundColor('#FFFFFF')
+      .shadow({ radius: 4, color: 'rgba(0,0,0,0.05)', offsetY: 2 })
 
-      if (this.showCreateDialog) {
+      Scroll() {
         Column() {
           Column() {
-            Row() {
-              Text('写树洞')
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#333333')
-              Blank()
-              Text('✕')
-                .fontSize(20)
-                .fontColor('#999999')
-                .onClick(() => this.showCreateDialog = false)
-            }
-            .width('100%')
-            .padding(20)
-            .border({
-              width: { bottom: 1 },
-              color: '#F0F0F0'
-            })
+            Text('写下一点心事')
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#333333')
+              .width('100%')
 
-            TextInput({ placeholder: '标题（可选）' })
+            TextInput({ placeholder: '标题（可选）', text: this.newTitle })
               .width('100%')
               .height(48)
               .backgroundColor('#F8F9FA')
@@ -165,7 +85,7 @@ struct TreeHole {
               .margin({ top: 16 })
               .onChange((value: string) => this.newTitle = value)
 
-            TextArea({ placeholder: '在这里写下你的心事，我会用心倾听...' })
+            TextArea({ placeholder: '在这里写下你的心事，我会用心倾听...', text: this.newContent })
               .width('100%')
               .height(180)
               .backgroundColor('#F8F9FA')
@@ -173,7 +93,10 @@ struct TreeHole {
               .padding(16)
               .fontSize(15)
               .margin({ top: 12 })
-              .onChange((value: string) => this.newContent = value)
+              .onChange((value: string) => {
+                this.newContent = value;
+                this.statusText = `正在编辑，字数 ${this.newContent.length}`;
+              })
 
             Row() {
               Text('允许 AI 分析')
@@ -191,41 +114,71 @@ struct TreeHole {
             .width('100%')
             .margin({ top: 12 })
 
-            Row() {
-              Button('取消')
-                .width('45%')
-                .height(48)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#666666')
-                .fontSize(15)
-                .borderRadius(24)
-                .onClick(() => this.showCreateDialog = false)
+            Text(`内容字数：${this.newContent.length}`)
+              .fontSize(12)
+              .fontColor('#888888')
+              .margin({ top: 12 })
 
-              Button('发布')
-                .width('45%')
-                .height(48)
-                .backgroundColor(this.newContent.length > 0 ? '#4CAF50' : '#CCCCCC')
-                .fontColor('#FFFFFF')
-                .fontSize(15)
+            Button(this.isLoading ? '发布中...' : '发布')
+              .width('100%')
+              .height(48)
+              .backgroundColor(this.newContent.trim().length > 0 ? '#4CAF50' : '#CCCCCC')
+              .fontColor('#FFFFFF')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .borderRadius(24)
+              .margin({ top: 14 })
+              .enabled(this.newContent.trim().length > 0 && !this.isLoading)
+              .onClick(() => this.createLetter())
+
+            Text(this.statusText)
+              .fontSize(12)
+              .fontColor('#888888')
+              .margin({ top: 10 })
+          }
+          .width('100%')
+          .padding({ left: 15, right: 15, top: 16, bottom: 12 })
+          .backgroundColor('#FFFFFF')
+          .borderRadius(16)
+          .shadow({ radius: 8, color: 'rgba(0,0,0,0.04)', offsetY: 2 })
+
+          if (this.letters.length === 0) {
+            Column() {
+              Text('📮')
+                .fontSize(60)
+                .margin({ top: 18 })
+              Text('还没有树洞')
+                .fontSize(18)
+                .fontColor('#666666')
                 .fontWeight(FontWeight.Medium)
-                .borderRadius(24)
-                .margin({ left: '10%' })
-                .enabled(this.newContent.length > 0 && !this.isLoading)
-                .onClick(() => this.createLetter())
+                .margin({ top: 10 })
+              Text('写下你的第一个心事吧')
+                .fontSize(14)
+                .fontColor('#999999')
+                .margin({ top: 8 })
             }
             .width('100%')
-            .margin({ top: 20 })
+            .padding({ top: 24, bottom: 18 })
+          } else {
+            Column() {
+              ForEach(this.letters, (letter: PrivateLetter) => {
+                this.LetterCard(letter)
+              })
+            }
+            .width('100%')
+            .margin({ top: 12 })
           }
-          .width('92%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(20)
         }
         .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0,0,0,0.5)')
-        .justifyContent(FlexAlign.Center)
+        .padding({ left: 15, right: 15, top: 12, bottom: 20 })
       }
+      .width('100%')
+      .layoutWeight(1)
+      .backgroundColor('#F8F9FA')
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#FFFFFF')
   }
 
   @Builder
@@ -287,27 +240,32 @@ struct TreeHole {
     .padding(16)
     .backgroundColor('#FFFFFF')
     .borderRadius(14)
-    .shadow({
-      radius: 8,
-      color: 'rgba(0,0,0,0.06)',
-      offsetX: 0,
-      offsetY: 2
-    })
+    .shadow({ radius: 8, color: 'rgba(0,0,0,0.06)', offsetX: 0, offsetY: 2 })
     .margin({ bottom: 12 })
   }
 
   async createLetter() {
-    if (!this.newContent.trim()) return;
+    if (!this.newContent.trim()) {
+      this.statusText = '请输入内容后再发布';
+      promptAction.showToast({ message: '请输入内容' });
+      return;
+    }
 
     this.isLoading = true;
+    this.statusText = '正在准备发布...';
 
     try {
+      await apiService.ensureAnonymousUser();
+      this.statusText = '正在发布...';
       let result = await apiService.createLetter(this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
       this.letters.unshift(result.letter);
-      this.showCreateDialog = false;
       this.newTitle = '';
       this.newContent = '';
+      this.statusText = '发布成功';
+      promptAction.showToast({ message: '树洞已发布' });
     } catch (error) {
+      this.statusText = '发布失败，请检查后端连接';
+      promptAction.showToast({ message: '发布失败' });
       console.error('Failed to create letter:', error);
     } finally {
       this.isLoading = false;

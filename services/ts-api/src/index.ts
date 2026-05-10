@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import { initDatabase } from './db';
 
 import authRoutes from './routes/auth';
+import anonymousProfileRoutes from './routes/anonymousProfile';
+import privacySettingsRoutes from './routes/privacySettings';
 import devicesRoutes from './routes/devices';
 import chatRoutes from './routes/chat';
 import lettersRoutes from './routes/letters';
@@ -26,6 +28,8 @@ initDatabase().then(() => {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/anonymous-profile', anonymousProfileRoutes);
+  app.use('/api/privacy-settings', privacySettingsRoutes);
   app.use('/api/devices', devicesRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/private-letters', lettersRoutes);
@@ -46,3 +50,4 @@ initDatabase().then(() => {
   console.error('Failed to initialize database:', error);
   process.exit(1);
 });
+

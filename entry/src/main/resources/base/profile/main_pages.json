@@ -4,6 +4,7 @@
     "pages/Chat",
     "pages/TreeHole",
     "pages/VoiceRecord",
-    "pages/EmotionReport"
+    "pages/EmotionReport",
+    "pages/AccountSettings"
   ]
 }

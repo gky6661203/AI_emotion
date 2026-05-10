@@ -10,6 +10,9 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     anonymous_token VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255),
+    account_status VARCHAR(20) DEFAULT 'active' CHECK (account_status IN ('active', 'disabled', 'pending')),
     nickname VARCHAR(100),
     avatar_url VARCHAR(500),
     campus VARCHAR(200),
@@ -51,6 +54,34 @@ CREATE TRIGGER trigger_update_user_state_vector
 -- ============================================
 -- Devices
 -- ============================================
+CREATE TABLE anonymous_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    display_name VARCHAR(100) NOT NULL,
+    avatar_url VARCHAR(500),
+    bio VARCHAR(300),
+    interests TEXT[] DEFAULT '{}',
+    campus VARCHAR(200),
+    enrollment_year INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE user_privacy_settings (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    allow_chat_analysis BOOLEAN DEFAULT true,
+    allow_letter_analysis BOOLEAN DEFAULT true,
+    allow_voice_analysis BOOLEAN DEFAULT true,
+    allow_profile_update BOOLEAN DEFAULT true,
+    allow_recommendation_use BOOLEAN DEFAULT true,
+    allow_match_use BOOLEAN DEFAULT false,
+    allow_voice_text_retention BOOLEAN DEFAULT true,
+    allow_multi_device_sync BOOLEAN DEFAULT false,
+    allow_emotion_reminders BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -121,6 +152,45 @@ CREATE TABLE private_letters (
 -- ============================================
 -- Voice Records
 -- ============================================
+CREATE TABLE public_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    anonymous_profile_id UUID REFERENCES anonymous_profiles(id) ON DELETE SET NULL,
+    title VARCHAR(200),
+    content TEXT NOT NULL,
+    topic VARCHAR(100),
+    allow_comments BOOLEAN DEFAULT true,
+    link_match_request BOOLEAN DEFAULT false,
+    ai_summary TEXT,
+    keywords TEXT[],
+    emotion VARCHAR(50),
+    emotion_intensity DECIMAL(3,2),
+    risk_level VARCHAR(20) DEFAULT 'low' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+    moderation_status VARCHAR(20) DEFAULT 'approved' CHECK (moderation_status IN ('pending', 'approved', 'rejected', 'hidden')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE post_reactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES public_posts(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reaction_type VARCHAR(50) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(post_id, user_id, reaction_type)
+);
+
+CREATE TABLE post_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES public_posts(id) ON DELETE CASCADE,
+    reporter_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(100) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed', 'actioned')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE voice_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -165,11 +235,14 @@ CREATE TABLE risk_events (
 -- Indexes
 -- ============================================
 CREATE INDEX idx_users_token ON users(anonymous_token) WHERE deleted_at IS NULL;
+CREATE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL AND email IS NOT NULL;
 CREATE INDEX idx_users_risk ON users(risk_level) WHERE deleted_at IS NULL;
 CREATE INDEX idx_users_created ON users(created_at DESC);
 
 CREATE INDEX idx_state_vectors_user ON user_state_vectors(user_id);
 CREATE INDEX idx_state_vectors_computed ON user_state_vectors(computed_at DESC);
+CREATE INDEX idx_anonymous_profiles_user ON anonymous_profiles(user_id);
+CREATE INDEX idx_privacy_settings_user ON user_privacy_settings(user_id);
 
 CREATE INDEX idx_devices_user ON devices(user_id) WHERE is_active = true;
 CREATE INDEX idx_devices_device_id ON devices(device_id);
@@ -185,6 +258,11 @@ CREATE INDEX idx_emotion_risk ON emotion_records(risk_detected) WHERE risk_detec
 CREATE INDEX idx_letters_user ON private_letters(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_letters_public ON private_letters(is_public) WHERE deleted_at IS NULL AND is_public = true;
 CREATE INDEX idx_letters_created ON private_letters(created_at DESC);
+CREATE INDEX idx_public_posts_created ON public_posts(created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_public_posts_topic ON public_posts(topic) WHERE deleted_at IS NULL;
+CREATE INDEX idx_public_posts_user ON public_posts(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_post_reactions_post ON post_reactions(post_id);
+CREATE INDEX idx_post_reports_post ON post_reports(post_id);
 
 CREATE INDEX idx_voice_user ON voice_records(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_voice_status ON voice_records(transcription_status, analysis_status);
@@ -209,13 +287,31 @@ CREATE TRIGGER update_users_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
+CREATE TRIGGER update_anonymous_profiles_updated_at
+    BEFORE UPDATE ON anonymous_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_privacy_settings_updated_at
+    BEFORE UPDATE ON user_privacy_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_public_posts_updated_at
+    BEFORE UPDATE ON public_posts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Comments
 -- ============================================
-COMMENT ON TABLE users IS 'Anonymous user accounts';
+COMMENT ON TABLE users IS 'User accounts with anonymous-token compatibility';
+COMMENT ON TABLE anonymous_profiles IS 'Public anonymous display identities';
+COMMENT ON TABLE user_privacy_settings IS 'User-controlled privacy preferences';
 COMMENT ON TABLE user_state_vectors IS 'User emotional state profile vectors';
 COMMENT ON TABLE devices IS 'User device bindings';
 COMMENT ON TABLE chat_messages IS 'Chat message history';
 COMMENT ON TABLE emotion_records IS 'Detected emotion events';
 COMMENT ON TABLE private_letters IS 'Private tree hole letters';
+COMMENT ON TABLE public_posts IS 'Anonymous plaza posts';
+COMMENT ON TABLE post_reactions IS 'Gentle reactions on anonymous plaza posts';
+COMMENT ON TABLE post_reports IS 'Reports for anonymous plaza posts';
 COMMENT ON TABLE voice_records IS 'Voice recording metadata';
 COMMENT ON TABLE risk_events IS 'Safety risk detection events';
+

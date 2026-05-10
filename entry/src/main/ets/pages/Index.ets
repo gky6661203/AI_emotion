@@ -139,6 +139,15 @@ struct Index {
           .borderRadius(16)
           .margin({ top: 18 })
           .onClick(() => router.pushUrl({ url: 'pages/Chat' }))
+          Button('直接开始匿名体验')
+            .width('90%')
+            .height(42)
+            .fontSize(14)
+            .fontColor('#7658F6')
+            .backgroundColor('#F2ECFF')
+            .borderRadius(14)
+            .margin({ top: 10 })
+            .onClick(() => router.pushUrl({ url: 'pages/AccountSettings' }))
         }
         .width('60%')
         .padding({ left: 24, top: 26 })
@@ -262,8 +271,17 @@ struct Index {
   @Builder Me() {
     Column() {
       Text('我的').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 38, bottom: 20 })
+      Button('去登录 / 账号设置')
+        .width('100%')
+        .height(48)
+        .fontSize(16)
+        .fontColor('#FFF')
+        .backgroundColor('#7658F6')
+        .borderRadius(16)
+        .margin({ bottom: 14 })
+        .onClick(() => router.pushUrl({ url: 'pages/AccountSettings' }))
+      this.Setting('账号与隐私', $r('app.media.profile'), 'pages/AccountSettings')
       this.Setting('多设备管理', $r('app.media.devices'))
-      this.Setting('隐私安全守护', $r('app.media.profile'))
       this.Setting('关于树洞', $r('app.media.comment'))
     }
     .width('100%')
@@ -271,7 +289,7 @@ struct Index {
     .padding({ left: 18, right: 18 })
     .backgroundColor('#F7F4FF')
   }
-  @Builder Setting(t: string, icon: Resource) {
+  @Builder Setting(t: string, icon: Resource, url?: string) {
     Row() {
       Image(icon)
         .width(22)
@@ -291,5 +309,10 @@ struct Index {
     .backgroundColor('#FFF')
     .borderRadius(16)
     .margin({ bottom: 12 })
+    .onClick(() => {
+      if (url) {
+        router.pushUrl({ url: url })
+      }
+    })
   }
 }

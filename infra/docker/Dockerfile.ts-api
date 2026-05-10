@@ -12,6 +12,7 @@ COPY services/ts-api/.env ./
 RUN npm run build
 
 COPY services/python-tools/ ./python-tools/
+COPY services/python-tools/requirements.txt ./python-tools/requirements.txt
 
 EXPOSE 8080
 
