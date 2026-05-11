@@ -3,7 +3,7 @@ import promptAction from '@ohos.promptAction';
 import { apiService } from '../services/ApiService';
 import { AnonymousProfile, UserPrivacySettings } from '../models/Types';
 
-const DEFAULT_API_BASE_URL = 'http://10.16.106.237:8080';
+const DEFAULT_API_BASE_URL = 'http://172.26.48.1:8080';
 
 @Entry
 @Component
@@ -41,16 +41,33 @@ struct AccountSettings {
     try {
       this.isLoading = true;
       this.syncBaseUrl();
-      await apiService.ensureAnonymousUser();
-      let profileResp = await apiService.getAnonymousProfile();
-      this.applyProfile(profileResp.profile);
-      let privacyResp = await apiService.getPrivacySettings();
-      this.applyPrivacy(privacyResp.settings);
-      this.status = '已进入匿名体验';
-      promptAction.showToast({ message: '已进入匿名体验' });
+
+      try {
+        let me = await apiService.getMe();
+        this.profileName = me.user.nickname || '用户';
+        this.nickname = this.profileName;
+        this.status = '已登录账号';
+      } catch {
+        this.profileName = '未登录';
+        this.nickname = '';
+        this.status = '请先登录账号';
+      }
+
+      try {
+        let profileResp = await apiService.getAnonymousProfile();
+        this.applyProfile(profileResp.profile);
+      } catch {
+        // If there is no anonymous profile yet, keep the current name.
+      }
+      try {
+        let privacyResp = await apiService.getPrivacySettings();
+        this.applyPrivacy(privacyResp.settings);
+      } catch {
+        // If privacy settings are unavailable, keep local defaults.
+      }
     } catch (err) {
       this.status = '暂时无法同步设置';
-      promptAction.showToast({ message: this.getErrorMessage(err, '匿名体验进入失败') });
+      promptAction.showToast({ message: this.getErrorMessage(err, '设置加载失败') });
       console.error('account settings load failed', err);
     } finally {
       this.isLoading = false;
@@ -79,12 +96,19 @@ struct AccountSettings {
     try {
       this.isLoading = true;
       this.syncBaseUrl();
-      await apiService.login(this.account, this.password);
+      if (!this.account.trim()) {
+        this.status = '请输入用户名';
+        promptAction.showToast({ message: '请输入用户名' });
+        return;
+      }
+      let result = await apiService.login(this.account.trim(), this.password);
+      apiService.setToken(result.token);
       this.status = '登录成功';
       promptAction.showToast({ message: '登录成功' });
       await this.load();
+      router.replaceUrl({ url: 'pages/Index' });
     } catch (err) {
-      this.status = '登录失败，请检查账号和密码';
+      this.status = '登录失败，请检查用户名和密码';
       promptAction.showToast({ message: this.getErrorMessage(err, '登录失败') });
       console.error('login failed', err);
     } finally {
@@ -96,13 +120,25 @@ struct AccountSettings {
     try {
       this.isLoading = true;
       this.syncBaseUrl();
-      await apiService.register(this.account, this.password, this.nickname, this.campus);
+      if (!this.account.trim()) {
+        this.status = '注册请填写用户名';
+        promptAction.showToast({ message: '注册请填写用户名' });
+        return;
+      }
+      let result = await apiService.register(this.account.trim(), this.password, this.nickname, this.campus);
+      apiService.setToken(result.token);
       this.status = '注册成功，已自动登录';
       promptAction.showToast({ message: '注册成功' });
       await this.load();
+      router.replaceUrl({ url: 'pages/Index' });
     } catch (err) {
-      this.status = '注册失败：账号至少 2 位，密码至少 8 位';
-      promptAction.showToast({ message: this.getErrorMessage(err, '注册失败') });
+      const message = this.getErrorMessage(err, '注册失败');
+      if (message.includes('409') || message.includes('已被注册') || message.includes('duplicate')) {
+        this.status = '这个用户名已经注册过了，请换一个再试';
+      } else {
+        this.status = '注册失败：用户名已存在，密码至少 8 位且含字母和数字';
+      }
+      promptAction.showToast({ message: this.status });
       console.error('register failed', err);
     } finally {
       this.isLoading = false;
@@ -160,6 +196,17 @@ struct AccountSettings {
     }
   }
 
+  async logout() {
+    try {
+      await apiService.logout();
+      this.status = '已退出登录';
+      promptAction.showToast({ message: '已退出登录' });
+      router.replaceUrl({ url: 'pages/LoginPage' });
+    } catch (err) {
+      promptAction.showToast({ message: this.getErrorMessage(err, '退出失败') });
+    }
+  }
+
   getErrorMessage(err: Error | string | number | boolean | null | undefined, fallback: string): string {
     if (err instanceof Error && err.message) {
       return err.message;
@@ -178,7 +225,7 @@ struct AccountSettings {
       // Header
       Row() {
         Text('‹').fontSize(30).fontColor('#7658F6').onClick(() => router.back())
-        Text('登录').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ left: 8 })
+        Text('账号与设置').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ left: 8 })
         Blank()
       }.width('100%').height(56).alignItems(VerticalAlign.Center)
 
@@ -189,6 +236,18 @@ struct AccountSettings {
             Text('🌿').fontSize(48)
             Text('树洞').fontSize(32).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 12 })
             Text(this.status).fontSize(13).fontColor('#8B849B').margin({ top: 8 })
+            TextInput({ text: this.apiBaseUrl, placeholder: '后端地址' })
+              .height(42)
+              .fontSize(14)
+              .fontColor('#201B34')
+              .backgroundColor('#F7F4FF')
+              .borderRadius(12)
+              .padding({ left: 14, right: 14 })
+              .margin({ top: 14 })
+              .onChange((value: string) => {
+                this.apiBaseUrl = value;
+                this.syncBaseUrl();
+              })
           }
           .width('100%')
           .padding({ top: 32, bottom: 32 })
@@ -213,7 +272,21 @@ struct AccountSettings {
                 if (event.type === TouchType.Down) { this.isPressed = true; }
                 else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.isPressed = false; }
               })
-              .onClick(() => this.load())
+              .onClick(async () => {
+                try {
+                  this.isLoading = true;
+                  let result = await apiService.createAnonymous();
+                  apiService.setToken(result.token);
+                  this.status = '已匿名进入';
+                  promptAction.showToast({ message: '匿名体验已开启' });
+                  router.replaceUrl({ url: 'pages/Index' });
+                } catch (err) {
+                  this.status = '匿名体验失败';
+                  promptAction.showToast({ message: this.getErrorMessage(err, '匿名体验失败') });
+                } finally {
+                  this.isLoading = false;
+                }
+              })
 
             Text('登录已有账号')
               .fontSize(14)
@@ -262,7 +335,25 @@ struct AccountSettings {
             .transition({ type: TransitionType.Insert, opacity: 0, translate: { y: -10 } })
           }
 
-          // Privacy hint
+          // Privacy controls
+          Column() {
+            Text('隐私设置').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ bottom: 10 })
+            this.SwitchRow('允许 AI 分析聊天', this.allowChatAnalysis, (v: boolean) => { this.allowChatAnalysis = v; })
+            this.SwitchRow('允许 AI 分析树洞', this.allowLetterAnalysis, (v: boolean) => { this.allowLetterAnalysis = v; })
+            this.SwitchRow('允许写入长期画像', this.allowProfileUpdate, (v: boolean) => { this.allowProfileUpdate = v; })
+            this.SwitchRow('允许推荐使用近期状态', this.allowRecommendationUse, (v: boolean) => { this.allowRecommendationUse = v; })
+            this.SwitchRow('允许保留语音转写', this.allowVoiceTextRetention, (v: boolean) => { this.allowVoiceTextRetention = v; })
+            this.SwitchRow('允许多设备同步', this.allowMultiDeviceSync, (v: boolean) => { this.allowMultiDeviceSync = v; })
+            this.SwitchRow('接收情绪提醒', this.allowEmotionReminders, (v: boolean) => { this.allowEmotionReminders = v; })
+            Button('保存隐私设置').width('100%').height(46).backgroundColor('#7658F6').fontColor('#FFF').borderRadius(23)
+              .margin({ top: 12 }).onClick(() => this.savePrivacy())
+          }
+          .width('100%')
+          .padding(20)
+          .backgroundColor('#FFF')
+          .borderRadius(20)
+          .margin({ left: 18, right: 18, top: 16 })
+
           Row() {
             Text('登录即表示同意')
               .fontSize(11)
@@ -271,7 +362,7 @@ struct AccountSettings {
               .fontSize(11)
               .fontColor('#7658F6')
           }
-          .margin({ top: 24 })
+          .margin({ top: 18 })
           .padding({ bottom: 32 })
         }
         .width('100%')
@@ -298,5 +389,13 @@ struct AccountSettings {
     }
     .width('100%')
     .margin({ top: 12 })
+  }
+
+  @Builder SwitchRow(label: string, value: boolean, onChange: (v: boolean) => void) {
+    Row() {
+      Text(label).fontSize(13).fontColor('#4A435B')
+      Blank()
+      Toggle({ type: ToggleType.Switch, isOn: value }).onChange(onChange)
+    }.width('100%').height(40)
   }
 }

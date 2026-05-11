@@ -1,13 +1,19 @@
-import { router } from '@kit.ArkUI';
-import { PrivateLetter } from '../models/Types';
+import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
+import { PublicPost } from '../models/Types';
 import { apiService } from '../services/ApiService';
 
+@Entry
 @Component
-export struct Plaza {
-  @State posts: PrivateLetter[] = [];
+struct Plaza {
+  @State posts: PublicPost[] = [];
   @State isLoading: boolean = false;
   @State showCreateDialog: boolean = false;
+  @State newTitle: string = '';
   @State newContent: string = '';
+  @State allowComments: boolean = true;
+  @State searchText: string = '';
+  @State statusText: string = '匿名广场';
 
   aboutToAppear() {
     this.loadPosts();
@@ -19,30 +25,46 @@ export struct Plaza {
       await apiService.ensureAnonymousUser();
       let res = await apiService.listPosts(50);
       this.posts = res.posts || [];
+      this.statusText = this.posts.length > 0 ? `已加载 ${this.posts.length} 条匿名内容` : '还没有匿名帖子';
     } catch (e) {
+      this.statusText = '加载失败，请检查后端是否启动';
       console.error('Failed to load posts', e);
     } finally {
       this.isLoading = false;
     }
   }
 
+  get filteredPosts(): PublicPost[] {
+    const keyword = this.searchText.trim().toLowerCase();
+    if (!keyword) {
+      return this.posts;
+    }
+    return this.posts.filter((post: PublicPost) => {
+      return (post.content || '').toLowerCase().includes(keyword) || (post.title || '').toLowerCase().includes(keyword);
+    });
+  }
+
   async publishPost() {
     if (!this.newContent.trim()) return;
     try {
-      let res = await apiService.createPost(this.newContent.trim());
+      let res = await apiService.createPost(this.newContent.trim(), this.newTitle || undefined, this.allowComments);
       this.posts.unshift(res.post);
       this.showCreateDialog = false;
+      this.newTitle = '';
       this.newContent = '';
+      this.allowComments = true;
+      this.statusText = '匿名帖子已发布';
+      promptAction.showToast({ message: '匿名帖子已发布' });
     } catch (e) {
       console.error('Publish error:', e);
-      // In real app, show toast error here
+      promptAction.showToast({ message: '发布失败' });
     }
   }
 
   async react(postId: string, type: string) {
     try {
       await apiService.addReaction(postId, type);
-      // Optional: show a small toast or animation
+      promptAction.showToast({ message: '已回应' });
     } catch (e) {
       console.error('React error:', e);
     }
@@ -69,16 +91,41 @@ export struct Plaza {
       .padding(16)
       .backgroundColor($r('app.color.color_white'))
 
+      Row() {
+        TextInput({ placeholder: '搜索匿名内容', text: this.searchText })
+          .layoutWeight(1)
+          .height(40)
+          .backgroundColor('#F5F5F5')
+          .borderRadius(20)
+          .padding({ left: 16, right: 16 })
+          .onChange((v: string) => { this.searchText = v; })
+        Button('刷新').margin({ left: 10 }).onClick(() => this.loadPosts())
+      }
+      .padding({ left: 16, right: 16, bottom: 8 })
+
       // Posts List
       if (this.isLoading && this.posts.length === 0) {
         LoadingProgress().width(48).height(48).margin({ top: 40 })
+      } else if (this.posts.length === 0) {
+        Column() {
+          Text('还没有匿名帖子')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .margin({ top: 40 })
+          Text('先发第一条匿名表达吧')
+            .fontSize(13)
+            .fontColor('#888888')
+            .margin({ top: 8 })
+        }
+        .width('100%')
+        .layoutWeight(1)
       } else {
         List({ space: 16 }) {
-          ForEach(this.posts, (post: PrivateLetter) => {
+          ForEach(this.filteredPosts, (post: PublicPost) => {
             ListItem() {
               this.PostCard(post)
             }
-          }, (item: PrivateLetter) => item.id)
+          }, (item: PublicPost) => item.id)
         }
         .width('100%')
         .layoutWeight(1)
@@ -100,23 +147,40 @@ export struct Plaza {
               .fontSize(18)
               .fontWeight(FontWeight.Bold)
               .margin({ bottom: 16 })
+            Text('请确认内容中没有真实姓名、手机号、宿舍号、微信号等隐私信息。')
+              .fontSize(12)
+              .fontColor('#8B849B')
+              .margin({ bottom: 12 })
             
-            TextArea({ placeholder: '分享你的情绪或倾诉...', text: this.newContent })
-              .height(120)
-              .onChange((v) => this.newContent = v)
+            TextInput({ placeholder: '标题（可选）', text: this.newTitle })
+              .height(42)
               .backgroundColor('#F5F5F5')
               .borderRadius(8)
-              .margin({ bottom: 24 })
+              .margin({ bottom: 10 })
+              .onChange((v: string) => this.newTitle = v)
+
+            TextArea({ placeholder: '分享你的情绪或倾诉...', text: this.newContent })
+              .height(120)
+              .onChange((v: string) => this.newContent = v)
+              .backgroundColor('#F5F5F5')
+              .borderRadius(8)
+              .margin({ bottom: 14 })
               
             Row() {
+              Text('允许评论')
+                .fontSize(13)
+                .fontColor('#666666')
+              Toggle({ type: ToggleType.Switch, isOn: this.allowComments })
+                .onChange((isOn: boolean) => this.allowComments = isOn)
+              Blank()
               Button('取消')
                 .backgroundColor('transparent')
                 .fontColor($r('app.color.color_unselected'))
                 .onClick(() => { this.showCreateDialog = false; })
-              Blank()
               Button('发布')
                 .backgroundColor($r('app.color.color_primary'))
                 .fontColor($r('app.color.color_white'))
+                .margin({ left: 10 })
                 .onClick(() => this.publishPost())
             }
             .width('100%')
@@ -137,12 +201,11 @@ export struct Plaza {
     .backgroundColor('#F7F4FF')
   }
 
-  @Builder PostCard(post: PrivateLetter) {
+  @Builder PostCard(post: PublicPost) {
     Column() {
       Row() {
         Circle().width(32).height(32).fill('#E2D9FF')
         Column() {
-          // Since it's anonymous, use a placeholder or generic name
           Text('匿名同学')
             .fontSize(14)
             .fontWeight(FontWeight.Bold)
@@ -165,8 +228,8 @@ export struct Plaza {
         .width('100%')
         
       Row() {
-        this.ReactionBtn('抱抱', () => this.react(post.id, 'hug'))
-        this.ReactionBtn('我懂你', () => this.react(post.id, 'understand'))
+        this.ReactionBtn('抱抱', (): void => { this.react(post.id, 'hug'); })
+        this.ReactionBtn('我懂你', (): void => { this.react(post.id, 'understand'); })
       }
       .width('100%')
     }

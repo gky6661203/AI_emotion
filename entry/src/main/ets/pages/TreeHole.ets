@@ -14,6 +14,8 @@ struct TreeHole {
   @State allowAiAnalysis: boolean = true;
   @State writeToProfile: boolean = true;
   @State statusText: string = '还没有树洞';
+  @State isEditing: boolean = false;
+  @State editingId: string = '';
 
   aboutToAppear() {
     this.loadLetters();
@@ -29,6 +31,16 @@ struct TreeHole {
       this.statusText = '加载失败，请检查后端是否启动';
       console.error('Failed to load letters:', error);
     }
+  }
+
+  private startEdit(letter: PrivateLetter): void {
+    this.isEditing = true;
+    this.editingId = letter.id;
+    this.newTitle = letter.title || '';
+    this.newContent = letter.content;
+    this.allowAiAnalysis = letter.allow_ai_analysis;
+    this.writeToProfile = letter.write_to_emotion_profile;
+    this.statusText = '正在编辑这封树洞';
   }
 
   build() {
@@ -69,11 +81,25 @@ struct TreeHole {
       Scroll() {
         Column() {
           Column() {
-            Text('写下一点心事')
-              .fontSize(18)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#333333')
-              .width('100%')
+            Row() {
+              Text(this.isEditing ? '编辑树洞' : '写下一点心事')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#333333')
+              Blank()
+              if (this.isEditing) {
+                Text('取消编辑')
+                  .fontSize(12)
+                  .fontColor('#4A90D9')
+                  .onClick(() => {
+                    this.isEditing = false;
+                    this.editingId = '';
+                    this.newTitle = '';
+                    this.newContent = '';
+                    this.statusText = '已取消编辑';
+                  })
+              }
+            }.width('100%')
 
             TextInput({ placeholder: '标题（可选）', text: this.newTitle })
               .width('100%')
@@ -119,7 +145,7 @@ struct TreeHole {
               .fontColor('#888888')
               .margin({ top: 12 })
 
-            Button(this.isLoading ? '发布中...' : '发布')
+            Button(this.isLoading ? (this.isEditing ? '保存中...' : '发布中...') : (this.isEditing ? '保存修改' : '发布'))
               .width('100%')
               .height(48)
               .backgroundColor(this.newContent.trim().length > 0 ? '#4CAF50' : '#CCCCCC')
@@ -130,6 +156,13 @@ struct TreeHole {
               .margin({ top: 14 })
               .enabled(this.newContent.trim().length > 0 && !this.isLoading)
               .onClick(() => this.createLetter())
+
+            if (this.isEditing) {
+              Text('当前为编辑模式，保存后会更新这封树洞。')
+                .fontSize(12)
+                .fontColor('#8B849B')
+                .margin({ top: 8 })
+            }
 
             Text(this.statusText)
               .fontSize(12)
@@ -226,6 +259,12 @@ struct TreeHole {
           .fontSize(12)
           .fontColor('#999999')
 
+        Text('编辑')
+          .fontSize(12)
+          .fontColor('#4A90D9')
+          .margin({ left: 12 })
+          .onClick(() => this.startEdit(letter))
+
         Text('删除')
           .fontSize(12)
           .fontColor('#F44336')
@@ -252,21 +291,29 @@ struct TreeHole {
     }
 
     this.isLoading = true;
-    this.statusText = '正在准备发布...';
+    this.statusText = this.isEditing ? '正在保存修改...' : '正在准备发布...';
 
     try {
       await apiService.ensureAnonymousUser();
-      this.statusText = '正在发布...';
-      let result = await apiService.createLetter(this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
-      this.letters.unshift(result.letter);
+      this.statusText = this.isEditing ? '正在保存...' : '正在发布...';
+      if (this.isEditing && this.editingId) {
+        let result = await apiService.updateLetter(this.editingId, this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
+        this.letters = this.letters.map(item => item.id === this.editingId ? result.letter : item);
+        promptAction.showToast({ message: '树洞已更新' });
+      } else {
+        let result = await apiService.createLetter(this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
+        this.letters.unshift(result.letter);
+        promptAction.showToast({ message: '树洞已发布' });
+      }
       this.newTitle = '';
       this.newContent = '';
-      this.statusText = '发布成功';
-      promptAction.showToast({ message: '树洞已发布' });
+      this.isEditing = false;
+      this.editingId = '';
+      this.statusText = '保存成功';
     } catch (error) {
-      this.statusText = '发布失败，请检查后端连接';
-      promptAction.showToast({ message: '发布失败' });
-      console.error('Failed to create letter:', error);
+      this.statusText = '保存失败，请检查后端连接';
+      promptAction.showToast({ message: '保存失败' });
+      console.error('Failed to create/update letter:', error);
     } finally {
       this.isLoading = false;
     }

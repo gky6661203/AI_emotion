@@ -51,6 +51,14 @@ function isPhone(account: string): boolean {
   return /^1[3-9]\d{9}$/.test(account);
 }
 
+function isUsername(account: string): boolean {
+  return !!account && !isEmail(account) && !isPhone(account);
+}
+
+function escapeLikeValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 function generateTokens(userId: string, role: string) {
   const accessToken = jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '2h' });
   const refreshToken = jwt.sign({ userId, role }, REFRESH_SECRET, { expiresIn: '7d' });
@@ -93,34 +101,30 @@ router.post('/send-code', async (req: Request, res: Response) => {
 // 2. 注册（简化版：无需验证码）
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const account = normalizeAccount(req.body.account ?? req.body.email);
+    const account = normalizeAccount(req.body.account ?? req.body.username);
     const password = String(req.body.password || '');
     const nickname = typeof req.body.nickname === 'string' ? req.body.nickname.trim() : '';
 
-    if (!account) { res.status(400).json({ error: 'account is required' }); return; }
+    console.log('[auth/register] body=', JSON.stringify({ account, hasPassword: !!password, nickname }));
+
+    if (!account) { res.status(400).json({ error: 'username is required' }); return; }
+    if (!isUsername(account)) { res.status(400).json({ error: 'username cannot be email or phone' }); return; }
     if (!checkPasswordStrength(password)) {
       res.status(400).json({ error: '密码太弱，至少8位且包含字母和数字' }); return; }
 
-    const is_email = isEmail(account);
-    const is_phone = isPhone(account);
-    const checkField = (is_email ? 'email' : (is_phone ? 'phone' : 'email'));
-
-    // Check duplicate
-    const existing = await queryOne(`SELECT id FROM users WHERE ${checkField} = $1 AND deleted_at IS NULL`, [account]);
-    if (existing) { res.status(409).json({ error: '该账号已被注册' }); return; }
+    const normalizedAccount = escapeLikeValue(account);
+    const existing = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND (lower(nickname) = $1 OR lower(email) = $1 OR lower(phone) = $1)`, [normalizedAccount]);
+    if (existing) { console.log('[auth/register] duplicate username=', normalizedAccount); res.status(409).json({ error: '该用户名已被注册' }); return; }
 
     const userId = uuidv4();
     const stateVectorId = uuidv4();
     const now = new Date().toISOString();
-    const displayName = nickname || `User_${Math.random().toString(36).substring(2, 8)}`;
-
-    const emailVal = is_email ? account : null;
-    const phoneVal = is_phone ? account : null;
+    const displayName = nickname || account;
 
     await execute(
-      `INSERT INTO users (id, anonymous_token, email, phone, password_hash, account_status, is_anonymous, role, nickname, risk_level, state_vector_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'active', false, 'user', $6, 'low', $7, $8, $9)`,
-      [userId, generateLegacyToken(), emailVal, phoneVal, hashPassword(password), displayName, stateVectorId, now, now]
+      `INSERT INTO users (id, anonymous_token, password_hash, account_status, is_anonymous, role, nickname, risk_level, state_vector_id, created_at, updated_at)
+       VALUES ($1, $2, $3, 'active', false, 'user', $4, 'low', $5, $6, $7)`,
+      [userId, generateLegacyToken(), hashPassword(password), displayName, stateVectorId, now, now]
     );
 
     await createStateVector(userId, stateVectorId, now);
@@ -138,27 +142,41 @@ router.post('/register', async (req: Request, res: Response) => {
 
 // 2b. 检查账号是否已存在（用于注册时实时校验）
 router.post('/check-account', async (req: Request, res: Response) => {
-  const account = normalizeAccount(req.body.account);
+  const account = normalizeAccount(req.body.account ?? req.body.username);
   if (!account) { res.status(400).json({ error: 'account is required' }); return; }
 
   const is_email = isEmail(account);
   const is_phone = isPhone(account);
-  const checkField = (is_email ? 'email' : (is_phone ? 'phone' : 'email'));
+  const is_username = isUsername(account);
 
-  const existing = await queryOne(`SELECT id FROM users WHERE ${checkField} = $1 AND deleted_at IS NULL`, [account]);
+  let existing: unknown = null;
+  if (is_username) {
+    existing = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(nickname) = $1`, [account]);
+  } else if (is_email) {
+    existing = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(email) = $1`, [account]);
+  } else if (is_phone) {
+    existing = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(phone) = $1`, [account]);
+  }
   res.json({ exists: !!existing });
 });
 
 // 2c. 忘记密码 - 发送重置验证码（Mock）
 router.post('/forgot-password/send-code', async (req: Request, res: Response) => {
-  const account = normalizeAccount(req.body.account);
+  const account = normalizeAccount(req.body.account ?? req.body.username);
   if (!account) { res.status(400).json({ error: 'account is required' }); return; }
 
   const is_email = isEmail(account);
   const is_phone = isPhone(account);
-  const checkField = (is_email ? 'email' : (is_phone ? 'phone' : 'email'));
+  const is_username = isUsername(account);
 
-  const user = await queryOne(`SELECT id FROM users WHERE ${checkField} = $1 AND deleted_at IS NULL`, [account]);
+  let user: User | null = null;
+  if (is_username) {
+    user = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(nickname) = $1`, [account]);
+  } else if (is_email) {
+    user = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(email) = $1`, [account]);
+  } else if (is_phone) {
+    user = await queryOne(`SELECT id FROM users WHERE deleted_at IS NULL AND lower(phone) = $1`, [account]);
+  }
   if (!user) { res.status(404).json({ error: '账号不存在' }); return; }
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -173,7 +191,7 @@ router.post('/forgot-password/send-code', async (req: Request, res: Response) =>
 
 // 2d. 重置密码
 router.post('/forgot-password/reset', async (req: Request, res: Response) => {
-  const account = normalizeAccount(req.body.account);
+  const account = normalizeAccount(req.body.account ?? req.body.username);
   const code = req.body.code;
   const newPassword = String(req.body.new_password || '');
 
@@ -226,17 +244,28 @@ router.patch('/password', authMiddleware, async (req: AuthenticatedRequest, res:
 // 3. 登录
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const account = normalizeAccount(req.body.account ?? req.body.email);
+    const account = normalizeAccount(req.body.account ?? req.body.username ?? req.body.email);
     const password = String(req.body.password || '');
+
+    console.log('[auth/login] body=', JSON.stringify({ account, hasPassword: !!password }));
 
     const is_email = isEmail(account);
     const is_phone = isPhone(account);
-    const checkField = is_email ? 'email' : (is_phone ? 'phone' : 'email');
+    const is_username = isUsername(account);
+    const normalizedAccount = escapeLikeValue(account);
 
-    const user = await queryOne<User>(`SELECT * FROM users WHERE ${checkField} = $1 AND deleted_at IS NULL`, [account]);
+    let user: User | null = null;
+    if (is_username) {
+      user = await queryOne<User>(`SELECT * FROM users WHERE deleted_at IS NULL AND lower(nickname) = $1`, [normalizedAccount]);
+    } else if (is_email) {
+      user = await queryOne<User>(`SELECT * FROM users WHERE deleted_at IS NULL AND lower(email) = $1`, [normalizedAccount]);
+    } else if (is_phone) {
+      user = await queryOne<User>(`SELECT * FROM users WHERE deleted_at IS NULL AND lower(phone) = $1`, [normalizedAccount]);
+    }
+    console.log('[auth/login] lookup=', JSON.stringify({ is_username, is_email, is_phone, found: !!user, userId: user?.id }));
     
-    if (!user) { res.status(401).json({ error: '账号或密码错误' }); return; }
-    if (user.account_status === 'disabled') { res.status(403).json({ error: '账号被禁用' }); return; }
+    if (!user) { console.log('[auth/login] rejected: user not found'); res.status(401).json({ error: '账号或密码错误' }); return; }
+    if (user.account_status === 'disabled') { console.log('[auth/login] rejected: disabled'); res.status(403).json({ error: '账号被禁用' }); return; }
 
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       res.status(403).json({ error: '登录失败次数过多，账号已锁定，请稍后再试' }); return;
@@ -249,6 +278,7 @@ router.post('/login', async (req: Request, res: Response) => {
         lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60000).toISOString();
       }
       await execute(`UPDATE users SET login_failures = $1, locked_until = $2 WHERE id = $3`, [failures, lockedUntil, user.id]);
+      console.log('[auth/login] rejected: bad password', JSON.stringify({ userId: user.id, failures }));
       res.status(401).json({ error: '账号或密码错误' }); return;
     }
 
@@ -263,6 +293,7 @@ router.post('/login', async (req: Request, res: Response) => {
       [user.id, refreshToken, deviceInfo, new Date(Date.now() + 7 * 24 * 3600000).toISOString()]);
 
     const updatedUser = await queryOne<User>('SELECT * FROM users WHERE id = $1', [user.id]);
+    console.log('[auth/login] success', JSON.stringify({ userId: user.id, role: user.role }));
     res.json({ user: updatedUser, token: accessToken, refreshToken });
   } catch (error) {
     console.error('Login error:', error);

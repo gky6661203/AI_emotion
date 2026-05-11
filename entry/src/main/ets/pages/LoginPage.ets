@@ -2,6 +2,12 @@ import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { apiService } from '../services/ApiService';
 
+interface ErrorRecord {
+  message?: string;
+  error?: string;
+  detail?: string;
+}
+
 @Entry
 @Component
 struct LoginPage {
@@ -9,6 +15,7 @@ struct LoginPage {
   @State password: string = '';
   @State nickname: string = '';
   @State confirmPassword: string = '';
+  @State backendUrl: string = 'http://172.26.48.1:8080';
   @State isRegisterMode: boolean = false;
   @State isLoading: boolean = false;
   @State isPressed: boolean = false;
@@ -17,18 +24,10 @@ struct LoginPage {
   @State errorMsg: string = '';
 
   aboutToAppear() {
-    this.checkExistingLogin();
-  }
-
-  async checkExistingLogin() {
-    try {
-      let me = await apiService.getMe();
-      if (me.user && me.user.nickname) {
-        router.replaceUrl({ url: 'pages/Index' });
-      }
-    } catch {
-      // Not logged in, stay on login page
-    }
+    // Always start from the login entry page so the user can choose login/register/anonymous
+    this.isRegisterMode = false;
+    this.errorMsg = '';
+    apiService.setBaseUrl(this.backendUrl);
   }
 
   checkPasswordStrength(pwd: string): number {
@@ -41,18 +40,45 @@ struct LoginPage {
     return strength;
   }
 
+  formatError(err: Error | string | ErrorRecord, fallback: string): string {
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+    if (typeof err === 'string' && err) {
+      return err;
+    }
+    let record = err as ErrorRecord;
+    if (typeof record.message === 'string' && record.message) {
+      return record.message;
+    }
+    if (typeof record.error === 'string' && record.error) {
+      return record.error;
+    }
+    if (typeof record.detail === 'string' && record.detail) {
+      return record.detail;
+    }
+    return fallback;
+  }
+
   async doLogin() {
     if (!this.account || !this.password) {
-      this.errorMsg = '请输入账号和密码';
+      this.errorMsg = '请输入用户名和密码';
       return;
     }
     this.errorMsg = '';
     this.isLoading = true;
     try {
-      await apiService.login(this.account, this.password);
+      const healthOk = await apiService.healthCheck();
+      if (!healthOk) {
+        this.errorMsg = '后端服务暂时不可用，请先检查后端是否已启动';
+        return;
+      }
+      let result = await apiService.login(this.account.trim(), this.password);
+      apiService.setToken(result.token);
+      await apiService.getMe();
       router.replaceUrl({ url: 'pages/Index' });
-    } catch (err: Error) {
-      this.errorMsg = err.message || '登录失败，请检查账号和密码';
+    } catch (err) {
+      this.errorMsg = this.formatError(err as Error | string | object, '登录失败，请检查用户名和密码');
     } finally {
       this.isLoading = false;
     }
@@ -60,7 +86,7 @@ struct LoginPage {
 
   async doRegister() {
     if (!this.account || !this.password) {
-      this.errorMsg = '请输入账号和密码';
+      this.errorMsg = '请输入用户名和密码';
       return;
     }
     if (this.password !== this.confirmPassword) {
@@ -74,10 +100,22 @@ struct LoginPage {
     this.errorMsg = '';
     this.isLoading = true;
     try {
-      await apiService.register(this.account, this.password, this.nickname);
+      const healthOk = await apiService.healthCheck();
+      if (!healthOk) {
+        this.errorMsg = '后端服务暂时不可用，请先检查后端是否已启动';
+        return;
+      }
+      let result = await apiService.register(this.account.trim(), this.password, this.nickname);
+      apiService.setToken(result.token);
+      await apiService.getMe();
       router.replaceUrl({ url: 'pages/Index' });
-    } catch (err: Error) {
-      this.errorMsg = err.message || '注册失败';
+    } catch (err) {
+      const message = this.formatError(err as Error | string | object, '注册失败');
+      if (message.includes('409') || message.includes('已被注册') || message.includes('duplicate')) {
+        this.errorMsg = '这个用户名已经注册过了，请换一个再试';
+      } else {
+        this.errorMsg = message || '注册失败';
+      }
     } finally {
       this.isLoading = false;
     }
@@ -101,7 +139,19 @@ struct LoginPage {
           Column() {
             Text('🌿').fontSize(56)
             Text('树洞').fontSize(36).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 8 })
-            Text(this.isRegisterMode ? '创建你的账号' : '欢迎回来').fontSize(14).fontColor('#8B849B').margin({ top: 6 })
+            Text(this.isRegisterMode ? '创建你的用户名' : '欢迎回来').fontSize(14).fontColor('#8B849B').margin({ top: 6 })
+            TextInput({ text: this.backendUrl, placeholder: '后端地址' })
+              .height(42)
+              .fontSize(14)
+              .fontColor('#201B34')
+              .backgroundColor('#F7F4FF')
+              .borderRadius(12)
+              .padding({ left: 14, right: 14 })
+              .margin({ top: 14 })
+              .onChange((value: string) => {
+                this.backendUrl = value;
+                apiService.setBaseUrl(value);
+              })
           }.width('100%').padding({ top: 40, bottom: 32 }).alignItems(HorizontalAlign.Center)
 
           if (this.errorMsg) {
@@ -113,7 +163,7 @@ struct LoginPage {
             if (this.isRegisterMode) {
               this.formInput('设置昵称（选填）', this.nickname, (v: string) => { this.nickname = v; })
             }
-            this.formInput(this.isRegisterMode ? '邮箱或手机号' : '账号', this.account, (v: string) => { this.account = v; })
+            this.formInput('用户名', this.account, (v: string) => { this.account = v; })
 
             Row() {
               TextInput({ text: this.password, placeholder: '密码' })
@@ -163,8 +213,21 @@ struct LoginPage {
               .onClick(() => { this.isRegisterMode = !this.isRegisterMode; this.errorMsg = ''; })
 
             if (!this.isRegisterMode) {
-              Text('随便看看').fontSize(13).fontColor('#B9B5C8').margin({ top: 12 })
-                .onClick(() => { router.replaceUrl({ url: 'pages/Index' }); })
+              Text('直接匿名体验').fontSize(13).fontColor('#B9B5C8').margin({ top: 12 })
+                .onClick(async () => {
+                  this.isLoading = true;
+                  this.errorMsg = '';
+                  try {
+                    let result = await apiService.createAnonymous();
+                    apiService.setToken(result.token);
+                    promptAction.showToast({ message: '已进入匿名体验' });
+                    router.replaceUrl({ url: 'pages/Index' });
+                  } catch (err) {
+                    this.errorMsg = this.formatError(err as Error | string | object, '匿名体验失败');
+                  } finally {
+                    this.isLoading = false;
+                  }
+                })
             }
           }
           .width('100%').padding(24).backgroundColor('#FFF').borderRadius(24)

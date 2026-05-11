@@ -1,8 +1,10 @@
 {
   "src": [
     "pages/Index",
+    "pages/LoginPage",
     "pages/Chat",
     "pages/TreeHole",
+    "pages/Plaza",
     "pages/VoiceRecord",
     "pages/EmotionReport",
     "pages/AccountSettings"

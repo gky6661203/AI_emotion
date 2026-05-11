@@ -2,8 +2,6 @@ import router from '@ohos.router';
 import { EmotionReport, EmotionDistributionItem } from '../models/Types';
 import { apiService } from '../services/ApiService';
 
-
-
 interface RecentRecord {
   emotion?: string;
   content?: string;
@@ -17,6 +15,7 @@ interface RecentRecord {
 struct EmotionReportPage {
   @State report: EmotionReport | null = null;
   @State isLoading: boolean = true;
+  @State days: number = 7;
 
   aboutToAppear() {
     this.loadReport();
@@ -42,23 +41,34 @@ struct EmotionReportPage {
 
         Blank()
 
-        Button() {
-          Row() {
-            Image($r('app.media.refresh'))
-              .width(14)
-              .height(14)
-              .fillColor('#FFFFFF')
-            Text(' 刷新')
-              .fontSize(13)
-              .fontColor('#FFFFFF')
+        Row() {
+          Text('7天').fontSize(12).fontColor(this.days === 7 ? '#FFFFFF' : '#4A90D9')
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .backgroundColor(this.days === 7 ? '#4A90D9' : '#EEF4FF').borderRadius(10)
+            .onClick(() => { this.days = 7; this.loadReport(); })
+          Text('30天').fontSize(12).fontColor(this.days === 30 ? '#FFFFFF' : '#4A90D9')
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .backgroundColor(this.days === 30 ? '#4A90D9' : '#EEF4FF').borderRadius(10)
+            .margin({ left: 8 })
+            .onClick(() => { this.days = 30; this.loadReport(); })
+          Button() {
+            Row() {
+              Image($r('app.media.refresh'))
+                .width(14)
+                .height(14)
+                .fillColor('#FFFFFF')
+              Text(' 刷新')
+                .fontSize(13)
+                .fontColor('#FFFFFF')
+            }
           }
-        }
-        .fontSize(13)
-        .backgroundColor('#4A90D9')
-        .borderRadius(14)
-        .height(28)
-        .margin({ right: 15 })
-        .onClick(() => this.loadReport())
+          .fontSize(13)
+          .backgroundColor('#4A90D9')
+          .borderRadius(14)
+          .height(28)
+          .margin({ left: 8 })
+          .onClick(() => this.loadReport())
+        }.margin({ right: 15 })
       }
       .width('100%')
       .height(56)
@@ -372,7 +382,7 @@ struct EmotionReportPage {
     this.isLoading = true;
 
     try {
-      this.report = await apiService.getEmotionReport(7);
+      this.report = await apiService.getEmotionReport(this.days);
     } catch (error) {
       console.error('Failed to load report:', error);
       this.report = null;

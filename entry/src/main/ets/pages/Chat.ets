@@ -1,6 +1,18 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
 import { ChatMessage } from '../models/Types';
 import { apiService } from '../services/ApiService';
+
+interface EmotionDetails {
+  risk_level?: string;
+  emotion?: string;
+  summary?: string;
+  response?: string;
+}
+
+interface EmotionAnalysisCarrier {
+  emotion_analysis?: EmotionDetails;
+}
 
 @Entry
 @Component
@@ -9,6 +21,10 @@ struct Chat {
   @State inputText: string = '';
   @State isLoading: boolean = false;
   @State lastRiskLevel: string = 'low';
+  @State emotionLabel: string = '平静';
+  @State emotionHint: string = '你可以从一句“我今天有点累”开始。';
+  @State showSafetyHelp: boolean = false;
+  @State safetyMessage: string = '如果你现在很难受，请优先联系现实中的可信任支持者。';
   scroller: Scroller = new Scroller();
 
   aboutToAppear() {
@@ -32,6 +48,28 @@ struct Chat {
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
+    }
+  }
+
+  private safeEmotionLabel(emotion: string): string {
+    switch (emotion) {
+      case 'happy': return '愉悦';
+      case 'sad': return '低落';
+      case 'angry': return '烦躁';
+      case 'anxious': return '焦虑';
+      case 'lonely': return '孤独';
+      default: return '平静';
+    }
+  }
+
+  private updateAnalysis(response: EmotionAnalysisCarrier): void {
+    if (response.emotion_analysis) {
+      this.lastRiskLevel = response.emotion_analysis.risk_level || 'low';
+      this.emotionLabel = this.safeEmotionLabel(response.emotion_analysis.emotion || 'neutral');
+      this.emotionHint = response.emotion_analysis.summary || response.emotion_analysis.response || this.emotionHint;
+      if (this.lastRiskLevel === 'critical' || this.lastRiskLevel === 'high') {
+        this.showSafetyHelp = true;
+      }
     }
   }
 
@@ -79,6 +117,19 @@ struct Chat {
         offsetY: 2
       })
 
+      Column() {
+        Row() {
+          Column() {
+            Text('当前情绪').fontSize(11).fontColor('#8B849B')
+            Text(this.emotionLabel).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#201B34')
+          }.alignItems(HorizontalAlign.Start)
+          Blank()
+          Text(`风险：${this.lastRiskLevel}`).fontSize(11).fontColor('#FF7A59')
+        }.width('100%')
+        Text(this.emotionHint).fontSize(12).fontColor('#7E788F').margin({ top: 6 }).width('100%')
+      }.width('100%').padding(14).backgroundColor('#FFF').borderRadius(14)
+        .margin({ left: 12, right: 12, top: 10 })
+
       // Messages List
       List({ scroller: this.scroller }) {
         ForEach(this.messages, (msg: ChatMessage, index: number) => {
@@ -107,12 +158,32 @@ struct Chat {
       .backgroundColor('#FFFFFF')
 
       if (this.lastRiskLevel === 'medium' || this.lastRiskLevel === 'high' || this.lastRiskLevel === 'critical') {
-        Text('如果你正处在危险中，请优先联系身边可信任的人或当地紧急求助资源。')
-          .fontSize(12)
-          .fontColor('#D9534F')
-          .backgroundColor('#FFF3F3')
-          .padding(10)
-          .width('100%')
+        Column() {
+          Text('如果你正处在危险中，请优先联系身边可信任的人或当地紧急求助资源。')
+            .fontSize(12)
+            .fontColor('#D9534F')
+          Row() {
+            Button('写入树洞').onClick(() => router.pushUrl({ url: 'pages/TreeHole' }))
+            Button('安全帮助').margin({ left: 8 }).onClick(async () => {
+              this.showSafetyHelp = true;
+              try {
+                const resources = await apiService.getSafetyResources();
+                if (resources.message) {
+                  this.safetyMessage = resources.message;
+                  this.emotionHint = resources.message;
+                  promptAction.showToast({ message: resources.message });
+                } else {
+                  this.safetyMessage = '已为你准备安全帮助资源';
+                  promptAction.showToast({ message: '已为你准备安全帮助资源' });
+                }
+              } catch {
+                this.safetyMessage = '请优先联系现实中的可信任支持者';
+                promptAction.showToast({ message: '请优先联系现实中的可信任支持者' });
+              }
+            })
+          }.margin({ top: 8 })
+          Text(this.safetyMessage).fontSize(12).fontColor('#B94A48').margin({ top: 8 })
+        }.width('100%').padding(10).backgroundColor('#FFF3F3')
       }
 
       // Input Area
@@ -137,10 +208,9 @@ struct Chat {
                 .height(22)
                 .color('#FFFFFF')
             } else {
-              Image($r('app.media.voice'))
-                .width(22)
-                .height(22)
-                .fillColor('#FFFFFF')
+              Text('发送')
+                .fontSize(13)
+                .fontColor('#FFFFFF')
             }
           }
           .width(44)
@@ -277,9 +347,7 @@ struct Chat {
 
     try {
       let response = await apiService.sendMessage(text);
-      if (response.emotion_analysis) {
-        this.lastRiskLevel = response.emotion_analysis.risk_level;
-      }
+      this.updateAnalysis(response as EmotionAnalysisCarrier);
       let lastIndex = this.messages.length - 1;
       if (lastIndex >= 0 && this.messages[lastIndex].role === 'assistant') {
         if (response.ai_response) {

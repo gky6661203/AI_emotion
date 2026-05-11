@@ -37,6 +37,17 @@ interface SendMessageResponse {
   emotion_analysis?: EmotionAnalysis;
 }
 
+interface SafetyResourceItem {
+  title: string;
+  description?: string;
+  url?: string;
+}
+
+interface SafetyResourcesResponse {
+  resources?: SafetyResourceItem[];
+  message?: string;
+}
+
 interface MessagesResponse {
   messages: ChatMessage[];
 }
@@ -167,8 +178,9 @@ interface AddReactionRequest {
   type: string;
 }
 
-const DEFAULT_BASE_URL = 'http://10.16.106.237:8080';
+const DEFAULT_BASE_URL = 'http://172.26.48.1:8080';
 const TIMEOUT = 30000;
+const AUTH_TOKEN_KEY = 'aiemotion_auth_token';
 
 export class ApiService {
   private token: string = '';
@@ -176,9 +188,24 @@ export class ApiService {
 
   setToken(token: string): void {
     this.token = token;
+    try {
+      AppStorage.SetOrCreate(AUTH_TOKEN_KEY, token);
+    } catch (err) {
+      console.error('persist token failed', err);
+    }
   }
 
   getToken(): string {
+    if (!this.token) {
+      try {
+        let stored = AppStorage.Get<string>(AUTH_TOKEN_KEY);
+        if (typeof stored === 'string') {
+          this.token = stored;
+        }
+      } catch (err) {
+        console.error('load token failed', err);
+      }
+    }
     return this.token;
   }
 
@@ -196,12 +223,12 @@ export class ApiService {
   }
 
   async ensureAnonymousUser(): Promise<User> {
-    if (this.token) {
+    if (this.getToken()) {
       try {
         let me = await this.getMe();
         return me.user;
       } catch {
-        this.token = '';
+        this.setToken('');
       }
     }
     let created = await this.createAnonymous();
@@ -212,8 +239,9 @@ export class ApiService {
     let headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    let token = this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
   }
@@ -329,6 +357,10 @@ export class ApiService {
       content: content
     };
     return this.request<SendMessageResponse>('POST', '/api/chat/messages', body);
+  }
+
+  async getSafetyResources(): Promise<SafetyResourcesResponse> {
+    return this.request<SafetyResourcesResponse>('GET', '/api/safety/resources');
   }
 
   async listLetters(keyword?: string, emotion?: string): Promise<LettersResponse> {

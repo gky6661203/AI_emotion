@@ -1,6 +1,11 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
 import { apiService } from '../services/ApiService';
-import { User } from '../models/Types';
+import { User, Recommendation, EmotionReport } from '../models/Types';
+
+interface EmotionReportResult extends EmotionReport {
+  risk_level?: string;
+}
 
 @Entry
 @Component
@@ -10,8 +15,12 @@ struct Index {
   @State care: string = '检测到你最近有些疲惫，要不要试试放松一下？';
   @State tag: number = 0;
   @State currentUser: User | null = null;
-  @State isAnonymous: boolean = true;
+  @State isAnonymous: boolean = false;
+  @State isGuest: boolean = true;
   @State isLoading: boolean = true;
+  @State recommendations: Recommendation[] = [];
+  @State emotionSummary: string = '今天先慢一点，也没关系';
+  @State riskLevel: string = 'low';
 
   aboutToAppear() { this.load(); }
 
@@ -20,18 +29,75 @@ struct Index {
       let me = await apiService.getMe();
       this.currentUser = me.user;
       this.isAnonymous = me.user.is_anonymous || me.user.role === 'anonymous';
-      let e = (await apiService.getTodayEmotion()).dominant_emotion || 'neutral';
-      this.emotion = e === 'happy' || e === 'joy' ? '愉悦' : e === 'sad' ? '低落' : e === 'anxious' || e === 'fear' ? '焦虑' : e === 'angry' ? '烦躁' : '平静';
-    } catch (err) {
-      // Not logged in - try anonymous
+      this.isGuest = false;
       try {
-        await apiService.ensureAnonymousUser();
-        let me = await apiService.getMe();
-        this.currentUser = me.user;
+        let today = await apiService.getTodayEmotion();
+        let e = today.dominant_emotion || 'neutral';
+        this.emotion = e === 'happy' || e === 'joy' ? '愉悦' : e === 'sad' ? '低落' : e === 'anxious' || e === 'fear' ? '焦虑' : e === 'angry' ? '烦躁' : '平静';
+        this.emotionSummary = today.summary || this.emotionSummary;
+        let maybeRisk = (today as EmotionReportResult).risk_level;
+        if (maybeRisk) {
+          this.riskLevel = maybeRisk;
+        }
+      } catch (emotionErr) {
+        console.error('load emotion failed', emotionErr);
+      }
+      try {
+        let rec = await apiService.getRecommendations(4);
+        this.recommendations = rec.recommendations || [];
+      } catch (recommendErr) {
+        console.error('load recommendations failed', recommendErr);
+      }
+    } catch (err) {
+      this.currentUser = null;
+      this.isAnonymous = false;
+      this.isGuest = true;
+      try {
+        let anonymous = await apiService.ensureAnonymousUser();
+        this.currentUser = anonymous;
+        this.isGuest = false;
         this.isAnonymous = true;
-      } catch (e2) { console.error('load failed', e2); }
+      } catch (guestErr) {
+        console.error('anonymous fallback failed', guestErr);
+      }
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  private requireAuth(actionName: string): boolean {
+    if (!this.isGuest) {
+      return true;
+    }
+    promptAction.showToast({ message: `${actionName}需要先登录或选择匿名体验` });
+    router.pushUrl({ url: 'pages/LoginPage' });
+    return false;
+  }
+
+  private openFeature(url: string, featureName: string): void {
+    if (featureName && !this.requireAuth(featureName)) {
+      return;
+    }
+    router.pushUrl({ url: url });
+  }
+
+  private refreshCurrentState(): void {
+    this.isLoading = true;
+    this.load();
+  }
+
+  async doLogout(): Promise<void> {
+    try {
+      await apiService.logout();
+    } catch (err) {
+      console.error('logout failed', err);
+    } finally {
+      apiService.setToken('');
+      this.currentUser = null;
+      this.isAnonymous = false;
+      this.isGuest = true;
+      promptAction.showToast({ message: '已退出登录' });
+      router.replaceUrl({ url: 'pages/LoginPage' });
     }
   }
 
@@ -46,10 +112,11 @@ struct Index {
       } else {
         Tabs({ barPosition: BarPosition.End }) {
           TabContent() { this.Home() }.tabBar(this.Tab('首页', $r('app.media.home'), 0))
-          TabContent() { this.Page('树洞', '这里是只属于你的私密空间', '进入树洞', 'pages/TreeHole') }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
-          TabContent() { this.Page('倾诉', '选择一种舒服的方式,把此刻说出来', '开始 AI 陪伴', 'pages/Chat') }.tabBar(this.MidTab())
-          TabContent() { this.Page('发现', '情绪报告、成长记录和个性化推荐', '查看报告', 'pages/EmotionReport') }.tabBar(this.Tab('发现', $r('app.media.community'), 3))
-          TabContent() { this.Me() }.tabBar(this.Tab('我的', $r('app.media.profile'), 4))
+          TabContent() { this.Page('树洞', '这里是只属于你的私密空间', '进入树洞', 'pages/TreeHole', '树洞') }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
+          TabContent() { this.Page('倾诉', '选择一种舒服的方式,把此刻说出来', '开始 AI 陪伴', 'pages/Chat', '倾诉') }.tabBar(this.MidTab())
+          TabContent() { this.Page('广场', '匿名表达与温和共鸣', '进入广场', 'pages/Plaza', '广场') }.tabBar(this.Tab('广场', $r('app.media.community'), 3))
+          TabContent() { this.Page('发现', '情绪报告、成长记录和个性化推荐', '查看报告', 'pages/EmotionReport', '发现') }.tabBar(this.Tab('发现', $r('app.media.community'), 4))
+          TabContent() { this.Me() }.tabBar(this.Tab('我的', $r('app.media.profile'), 5))
         }.barHeight(68).barBackgroundColor('#FFFFFF').backgroundColor('#F7F4FF').onChange((i: number) => { this.tab = i; })
       }
     }
@@ -81,7 +148,7 @@ struct Index {
         this.Hero()
         this.Status()
         this.Recommend()
-        this.Buddies()
+        this.EntryGrid()
         this.Device()
         Text('陪伴而不诊断，引导而不治疗').fontSize(11).fontColor('#B9B5C8').margin({ top: 16, bottom: 18 })
       }
@@ -103,6 +170,12 @@ struct Index {
         }
       }.width('100%').height(18)
       Row() {
+        Text(`情绪：${this.emotion}`).fontSize(11).fontColor('#6E6781')
+        Text(` · ${this.emotionSummary}`).fontSize(11).fontColor('#6E6781')
+        Blank()
+        Text(`风险 ${this.riskLevel}`).fontSize(11).fontColor(this.riskLevel === 'high' || this.riskLevel === 'critical' ? '#D9534F' : '#6E6781')
+      }.width('100%').margin({ top: 6 })
+      Row() {
         Stack() {
           Circle().width(42).height(42).fill(this.isAnonymous ? '#9B8FEA' : '#7A62FF')
           Circle().width(18).height(18).fill('#FFFFFF99')
@@ -110,9 +183,9 @@ struct Index {
         Column() {
           Text(this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '用户'))
             .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#19162B')
-          Text(this.isAnonymous ? '匿名模式' : (this.currentUser?.email || this.currentUser?.phone || '已登录'))
+          Text(this.isGuest ? '未登录' : (this.isAnonymous ? '匿名模式' : '正式账号'))
             .fontSize(8).fontColor('#FFF').padding({ left: 6, right: 6 })
-            .backgroundColor(this.isAnonymous ? '#9B8FEA' : '#7D8DFF').borderRadius(7)
+            .backgroundColor(this.isGuest ? '#B9B5C8' : (this.isAnonymous ? '#9B8FEA' : '#7D8DFF')).borderRadius(7)
         }.alignItems(HorizontalAlign.Start)
         Blank()
         Text('首页').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#171329').padding({ bottom: 6 })
@@ -126,9 +199,9 @@ struct Index {
     Stack() {
       Row() {
         Column() {
-          Text(this.isAnonymous ? '👋 欢迎来到树洞' : '👋 欢迎回来')
+          Text(this.isGuest ? '👋 欢迎来到树洞' : (this.isAnonymous ? '👋 欢迎来到树洞' : '👋 欢迎回来'))
             .fontSize(24).fontWeight(FontWeight.Bold).fontColor('#17112D').maxLines(1)
-          Text(this.isAnonymous ? '在这里你可以放心倾诉' : '很高兴再次见到你')
+          Text(this.isGuest ? '请先登录、注册或选择匿名体验' : (this.isAnonymous ? '在这里你可以放心倾诉' : '很高兴再次见到你'))
             .fontSize(13).fontColor('#77708B').margin({ top: 8 })
           Row() {
             this.Pill('无压力倾诉')
@@ -139,27 +212,39 @@ struct Index {
             Image($r('app.media.comment')).width(20).height(20).fillColor('#FFF').margin({ right: 8 })
             Column() {
               Text('想说点什么吗？').fontSize(14).fontColor('#FFF').fontWeight(FontWeight.Bold)
-              Text('点击开始倾诉...').fontSize(10).fontColor('#E7DEFF')
+              Text(this.isGuest ? '请先登录或选择匿名体验' : '点击开始倾诉...').fontSize(10).fontColor('#E7DEFF')
             }.alignItems(HorizontalAlign.Start)
             Blank()
             Image($r('app.media.arrow_right')).width(20).height(20).fillColor('#FFF')
           }.height(58).width('90%').padding({ left: 14, right: 12 })
-            .backgroundColor(this.isAnonymous ? '#9B8FEA' : '#8061F8').borderRadius(16).margin({ top: 18 })
-            .onClick(() => router.pushUrl({ url: 'pages/Chat' }))
-          Button(this.isAnonymous ? '登录账号体验完整功能' : '开始今日倾诉')
+            .backgroundColor(this.isGuest ? '#AFA7D8' : (this.isAnonymous ? '#9B8FEA' : '#8061F8')).borderRadius(16).margin({ top: 18 })
+            .onClick(() => this.openFeature('pages/Chat', '倾诉'))
+          Button(this.isGuest ? '去登录或匿名体验' : (this.isAnonymous ? '登录账号体验完整功能' : '开始今日倾诉'))
             .width('90%').height(42).fontSize(14)
-            .fontColor(this.isAnonymous ? '#7658F6' : '#FFF')
-            .backgroundColor(this.isAnonymous ? '#F2ECFF' : '#7658F6').borderRadius(14).margin({ top: 10 })
+            .fontColor(this.isGuest ? '#7658F6' : (this.isAnonymous ? '#7658F6' : '#FFF'))
+            .backgroundColor(this.isGuest ? '#F2ECFF' : (this.isAnonymous ? '#F2ECFF' : '#7658F6')).borderRadius(14).margin({ top: 10 })
             .onClick(() => {
-              if (this.isAnonymous) {
+              if (this.isGuest) {
                 router.pushUrl({ url: 'pages/LoginPage' });
+              } else {
+                this.openFeature('pages/Chat', '倾诉');
               }
             })
         }.width('60%').padding({ left: 24, top: 26 }).alignItems(HorizontalAlign.Start)
         Blank()
         this.Tree()
       }.height('100%')
-      if (!this.isAnonymous) {
+      if (this.isGuest) {
+        Text('👤 未登录')
+          .fontSize(11).fontColor('#FFF').textAlign(TextAlign.Center)
+          .padding(10).backgroundColor('#8E89A6AA').borderRadius(18)
+          .position({ x: '76%', y: 52 })
+      } else if (this.isAnonymous) {
+        Text('🛡 游客模式')
+          .fontSize(11).fontColor('#FFF').textAlign(TextAlign.Center)
+          .padding(10).backgroundColor('#5A436688').borderRadius(18)
+          .position({ x: '76%', y: 52 })
+      } else {
         Text('🛡 已登录账号')
           .fontSize(11).fontColor('#FFF').textAlign(TextAlign.Center)
           .padding(10).backgroundColor('#5A436688').borderRadius(18)
@@ -249,9 +334,14 @@ struct Index {
           Blank()
         }
         Text(this.care).fontSize(11).fontColor('#60596F').lineHeight(18).width('72%').margin({ top: 12 })
-        Button('聊一聊').width(84).height(28).fontSize(11).fontColor('#7860E9')
-          .backgroundColor('#FFF').borderRadius(14).margin({ top: 10 })
-          .onClick(() => { this.care = '我在这里，先做三次深呼吸，再慢慢告诉我发生了什么。'; })
+        Row() {
+          Button('聊一聊').width(84).height(28).fontSize(11).fontColor('#7860E9')
+            .backgroundColor('#FFF').borderRadius(14)
+            .onClick(() => this.openFeature('pages/Chat', '倾诉'))
+          Button('写树洞').width(84).height(28).fontSize(11).fontColor('#7860E9')
+            .backgroundColor('#FFF').borderRadius(14).margin({ left: 8 })
+            .onClick(() => this.openFeature('pages/TreeHole', '树洞'))
+        }.margin({ top: 10 })
       }.padding(14).width('100%').height('100%').alignItems(HorizontalAlign.Start)
       Stack() {
         Circle().width(84).height(84).fill('#E2D9FF')
@@ -283,7 +373,22 @@ struct Index {
         GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('今日快乐小视频', '治愈瞬间，好心情', '05:12', '#C9A391') }
         GridCol({ span: { xs: 6, sm: 3 } }) { this.Rec('睡前减压冥想', '释放压力，安然入眠', '03:21', '#6D74B8') }
       }.width('100%')
+      Row() {
+        this.QuickAction('呼吸练习', 'pages/Chat', '倾诉')
+        this.QuickAction('写入树洞', 'pages/TreeHole', '树洞')
+        this.QuickAction('去广场', 'pages/Plaza', '广场')
+        this.QuickAction('看报告', 'pages/EmotionReport', '发现')
+      }.margin({ top: 10 }).width('100%')
     }.width('100%')
+  }
+
+  @Builder EntryGrid() {
+    GridRow({ columns: 12, gutter: { x: 10, y: 10 } }) {
+      GridCol({ span: { xs: 6, sm: 3 } }) { this.EntryCard('AI 聊天', '倾诉和陪伴', '#8B6FF7', 'pages/Chat', '倾诉') }
+      GridCol({ span: { xs: 6, sm: 3 } }) { this.EntryCard('私密树洞', '只给自己看', '#6DAA90', 'pages/TreeHole', '树洞') }
+      GridCol({ span: { xs: 6, sm: 3 } }) { this.EntryCard('匿名广场', '匿名表达', '#E18B71', 'pages/Plaza', '广场') }
+      GridCol({ span: { xs: 6, sm: 3 } }) { this.EntryCard('情绪报告', '查看趋势', '#5F7DDB', 'pages/EmotionReport', '发现') }
+    }.width('100%').margin({ top: 12 })
   }
 
   @Builder Tag(t: string, i: number) {
@@ -353,13 +458,39 @@ struct Index {
       .shadow({ radius: 12, color: '#8B7ED622', offsetY: 4 })
   }
 
-  @Builder Page(t: string, d: string, b: string, u: string) {
+  @Builder EntryCard(title: string, desc: string, color: string, url: string, featureName: string) {
+    Column() {
+      Circle().width(44).height(44).fill(color)
+      Text(title).fontSize(13).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 10 })
+      Text(desc).fontSize(10).fontColor('#7E788F').margin({ top: 4 }).textAlign(TextAlign.Center)
+    }.width('100%').height(120).padding(10).backgroundColor('#FFF').borderRadius(14)
+      .shadow({ radius: 8, color: '#8B7ED614', offsetY: 3 })
+      .onClick(() => this.openFeature(url, featureName))
+  }
+
+  @Builder QuickAction(text: string, url: string, featureName: string) {
+    Text(text)
+      .fontSize(11)
+      .fontColor('#4A90D9')
+      .backgroundColor('#E8F4FD')
+      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+      .borderRadius(14)
+      .margin({ right: 8 })
+      .onClick(() => this.openFeature(url, featureName))
+  }
+
+  @Builder Page(t: string, d: string, b: string, u: string, featureName?: string) {
     Column() {
       Text(t).fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 38, bottom: 20 })
       Text(d).fontSize(13).fontColor('#8B849B')
       Button(b).width(210).height(48).fontSize(16).fontColor('#FFF')
         .backgroundColor('#7658F6').borderRadius(24).margin({ top: 40 })
-        .onClick(() => router.pushUrl({ url: u }))
+        .onClick(() => {
+          if (featureName && !this.requireAuth(featureName)) {
+            return;
+          }
+          router.pushUrl({ url: u })
+        })
     }.width('100%').height('100%').backgroundColor('#F7F4FF').alignItems(HorizontalAlign.Center)
   }
 
@@ -367,16 +498,21 @@ struct Index {
     Column() {
       Text('我的').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ top: 38, bottom: 20 })
 
-      // User info card
       Column() {
         Row() {
-          Circle().width(48).height(48).fill(this.isAnonymous ? '#9B8FEA' : '#7A62FF')
+          Circle().width(48).height(48).fill(this.isGuest ? '#C5BEDA' : (this.isAnonymous ? '#9B8FEA' : '#7A62FF'))
           Column() {
-            Text(this.currentUser?.nickname || '匿名同学').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#201B34')
-            Text(this.isAnonymous ? '匿名模式 · 可升级为正式账号' : '正式账号').fontSize(11).fontColor('#8B849B')
+            Text(this.isGuest ? '未登录' : (this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '用户')))
+              .fontSize(16).fontWeight(FontWeight.Bold).fontColor('#201B34')
+            Text(this.isGuest ? '请先登录或匿名体验' : (this.isAnonymous ? '匿名模式' : '正式账号'))
+              .fontSize(11).fontColor('#8B849B')
           }.alignItems(HorizontalAlign.Start).margin({ left: 12 })
           Blank()
-          if (this.isAnonymous) {
+          if (this.isGuest) {
+            Text('去登录').fontSize(12).fontColor('#FFF').backgroundColor('#7658F6')
+              .borderRadius(12).padding({ left: 12, right: 12, top: 4, bottom: 4 })
+              .onClick(() => router.pushUrl({ url: 'pages/LoginPage' }))
+          } else if (this.isAnonymous) {
             Text('升级').fontSize(12).fontColor('#FFF').backgroundColor('#7658F6')
               .borderRadius(12).padding({ left: 12, right: 12, top: 4, bottom: 4 })
               .onClick(() => router.pushUrl({ url: 'pages/LoginPage' }))
@@ -384,21 +520,16 @@ struct Index {
         }
       }.width('100%').padding(16).backgroundColor('#FFF').borderRadius(16).margin({ bottom: 14 })
 
-      if (!this.isAnonymous) {
-        this.Setting('个人资料', $r('app.media.profile'), 'pages/ProfilePage')
-        this.Setting('修改密码', $r('app.media.profile'))
-      }
       this.Setting('账号与隐私', $r('app.media.profile'), 'pages/AccountSettings')
+      this.Setting('个人资料', $r('app.media.profile'), 'pages/AccountSettings')
+      this.Setting('修改密码', $r('app.media.profile'))
       this.Setting('多设备管理', $r('app.media.devices'))
       this.Setting('关于树洞', $r('app.media.comment'))
 
-      if (!this.isAnonymous) {
+      if (!this.isGuest) {
         Button('退出登录').width('100%').height(48).fontSize(15).fontColor('#FF6B6B')
           .backgroundColor('#FFF0F0').borderRadius(16).margin({ top: 14 })
-          .onClick(() => {
-            apiService.setToken('');
-            router.replaceUrl({ url: 'pages/LoginPage' });
-          })
+          .onClick(() => { this.doLogout(); })
       }
     }.width('100%').height('100%').padding({ left: 18, right: 18 }).backgroundColor('#F7F4FF')
   }
@@ -411,6 +542,17 @@ struct Index {
       Image($r('app.media.arrow_right')).width(18).height(18).fillColor('#A9A2B8')
     }.width('100%').height(58).padding({ left: 16, right: 16 }).backgroundColor('#FFF')
       .borderRadius(16).margin({ bottom: 12 })
-      .onClick(() => { if (url) { router.pushUrl({ url: url }); } })
+      .onClick(() => {
+        if (!this.isGuest && url) {
+          router.pushUrl({ url: url });
+          return;
+        }
+        if (this.isGuest) {
+          promptAction.showToast({ message: '请先登录或选择匿名体验' });
+          router.pushUrl({ url: 'pages/LoginPage' });
+        } else if (url) {
+          router.pushUrl({ url: url });
+        }
+      })
   }
 }
