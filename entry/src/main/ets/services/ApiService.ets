@@ -167,7 +167,7 @@ interface AddReactionRequest {
   type: string;
 }
 
-const DEFAULT_BASE_URL = 'http://172.26.48.1:8080';
+const DEFAULT_BASE_URL = 'http://10.16.106.237:8080';
 const TIMEOUT = 30000;
 
 export class ApiService {
@@ -236,11 +236,11 @@ export class ApiService {
       let detail = '';
       try {
         let parsed = JSON.parse(httpResponse.result as string) as Record<string, string>;
-        detail = parsed.detail ? `: ${parsed.detail}` : '';
+        detail = parsed.error || parsed.detail || '';
       } catch {
-        detail = '';
+        detail = httpResponse.result as string || '';
       }
-      throw new Error(`HTTP ${httpResponse.responseCode}${detail}`);
+      throw new Error(detail || `HTTP ${httpResponse.responseCode}`);
     }
 
     return JSON.parse(httpResponse.result as string) as T;

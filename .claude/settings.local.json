@@ -16,7 +16,20 @@
       "Bash(git reset *)",
       "Bash(npm run *)",
       "Bash(npm install *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Read(//c/Users/32328/.claude/plugins/marketplaces/**)",
+      "Bash(rm -rf \"nextlevelbuilder-ui-ux-pro-max-skill--plugin-install-ui-ux-pro-max\")",
+      "Bash(/plugin add *)",
+      "Bash(curl -s http://10.16.106.237:8080/health)",
+      "Bash(curl -s -X POST http://10.16.106.237:8080/api/auth/send-code -H 'Content-Type: application/json' -d '{\"account\":\"test@example.com\",\"type\":\"register\"}')",
+      "Bash(curl -s -X POST http://10.16.106.237:8080/api/auth/register -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(PGPASSWORD=postgres psql -h localhost -U postgres -d aiemotion -c \"SELECT target, code, type, expires_at, used FROM verification_codes ORDER BY created_at DESC LIMIT 5;\")",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 26364)",
+      "Bash(kill -9 26364)",
+      "Bash(nohup npm *)",
+      "Bash(npm start *)"
     ]
   }
 }

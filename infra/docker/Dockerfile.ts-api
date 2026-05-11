@@ -1,18 +1,24 @@
-FROM node:20-alpine
+FROM docker.m.daocloud.io/library/node:20-alpine
 
 WORKDIR /app
 
+# 先复制 package 文件以利用 Docker 缓存
 COPY services/ts-api/package*.json ./
-RUN npm install
 
+# 配置 npm 镜像并安装依赖 (需要安装全部依赖包括 devDependencies 才能运行 tsc)
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install
+
+# 复制源代码
 COPY services/ts-api/tsconfig.json ./
 COPY services/ts-api/src ./src
 COPY services/ts-api/.env ./
 
+# 构建 TypeScript 代码
 RUN npm run build
 
-COPY services/python-tools/ ./python-tools/
-COPY services/python-tools/requirements.txt ./python-tools/requirements.txt
+# 复制 Python 工具
+COPY services/python-tools ./python-tools/
 
 EXPOSE 8080
 

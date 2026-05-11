@@ -1,8 +1,12 @@
 export interface User {
   id: string;
-  anonymous_token: string;
+  anonymous_token?: string;
   email?: string;
+  phone?: string;
+  password_hash?: string;
   account_status?: string;
+  is_anonymous?: boolean;
+  role?: string;
   nickname?: string;
   avatar_url?: string;
   campus?: string;
@@ -10,6 +14,8 @@ export interface User {
   risk_level: string;
   state_vector_id?: string;
   total_interactions: number;
+  login_failures?: number;
+  locked_until?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string;
