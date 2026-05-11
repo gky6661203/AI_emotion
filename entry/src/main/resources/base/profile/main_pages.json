@@ -4,9 +4,16 @@
     "pages/LoginPage",
     "pages/Chat",
     "pages/TreeHole",
+    "pages/TreeHoleDetail",
     "pages/Plaza",
+    "pages/PostDetail",
     "pages/VoiceRecord",
+    "pages/VoiceRecordDetail",
     "pages/EmotionReport",
-    "pages/AccountSettings"
+    "pages/RecommendationPage",
+    "pages/ProfileTimeline",
+    "pages/MatchPage",
+    "pages/AccountSettings",
+    "pages/SafetyHelp"
   ]
 }

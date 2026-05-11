@@ -19,8 +19,19 @@ router.get('/current', async (req: AuthenticatedRequest, res: Response) => {
     const userId = user.id;
     const limit = Math.min(parseInt(req.query.limit as string) || 5, 10);
 
-    if (user.risk_level === 'high' || user.risk_level === 'critical') {
-      res.json({ recommendations: safetyRecommendations.slice(0, limit), risk_level: user.risk_level });
+    const profileOverview = await query<{ dominant_emotion: string; average_intensity: number; risk_rate: number; preference_signals: string; state_vector: string }>(
+      `SELECT
+         COALESCE((SELECT emotion FROM emotion_records WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1), 'neutral') AS dominant_emotion,
+         COALESCE((SELECT AVG(intensity) FROM emotion_records WHERE user_id = $1), 0) AS average_intensity,
+         COALESCE((SELECT AVG(CASE WHEN risk_detected THEN 1 ELSE 0 END) FROM emotion_records WHERE user_id = $1), 0) AS risk_rate,
+         '{}'::text AS preference_signals,
+         '{}'::text AS state_vector`,
+      [userId]
+    );
+    const profileState = profileOverview[0];
+
+    if (user.risk_level === 'high' || user.risk_level === 'critical' || Number(profileState?.risk_rate || 0) > 0.2) {
+      res.json({ recommendations: safetyRecommendations.slice(0, limit), risk_level: user.risk_level || 'high', dominant_emotion: profileState?.dominant_emotion || 'neutral', average_intensity: Number(profileState?.average_intensity || 0) });
       return;
     }
 

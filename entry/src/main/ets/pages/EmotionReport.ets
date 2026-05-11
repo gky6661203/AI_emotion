@@ -16,6 +16,7 @@ struct EmotionReportPage {
   @State report: EmotionReport | null = null;
   @State isLoading: boolean = true;
   @State days: number = 7;
+  @State reportHint: string = '正在为你整理这段时间的情绪变化';
 
   aboutToAppear() {
     this.loadReport();
@@ -85,7 +86,7 @@ struct EmotionReportPage {
             .width(40)
             .height(40)
             .color('#4A90D9')
-          Text('加载中...')
+          Text(this.reportHint)
             .fontSize(14)
             .fontColor('#999999')
             .margin({ top: 12 })
@@ -110,21 +111,33 @@ struct EmotionReportPage {
       } else {
         Column() {
           Column() {
-            Text('📊')
-              .fontSize(60)
-              .margin({ top: 60 })
             Text('暂无报告数据')
               .fontSize(16)
               .fontColor('#666666')
-              .margin({ top: 15 })
-            Button('创建匿名用户')
-              .width(160)
-              .height(44)
-              .backgroundColor('#4A90D9')
-              .borderRadius(22)
-              .fontColor('#FFFFFF')
-              .margin({ top: 25 })
-              .onClick(() => this.initUser())
+              .margin({ top: 60 })
+            Text('先聊聊、写树洞，或者记录一段心情，报告会慢慢出现。')
+              .fontSize(13)
+              .fontColor('#999999')
+              .textAlign(TextAlign.Center)
+              .width('80%')
+              .margin({ top: 14 })
+            Row() {
+              Button('创建匿名用户')
+                .width(150)
+                .height(44)
+                .backgroundColor('#4A90D9')
+                .borderRadius(22)
+                .fontColor('#FFFFFF')
+                .onClick(() => this.initUser())
+              Button('去写树洞')
+                .width(120)
+                .height(44)
+                .backgroundColor('#EEF4FF')
+                .borderRadius(22)
+                .fontColor('#4A90D9')
+                .margin({ left: 10 })
+                .onClick(() => router.pushUrl({ url: 'pages/TreeHole' }))
+            }.margin({ top: 25 })
           }
           .layoutWeight(1)
         }
@@ -331,7 +344,7 @@ struct EmotionReportPage {
               .width(40)
 
             Column() {
-              Text(record.emotion || 'unknown')
+              Text(record.emotion || 'neutral')
                 .fontSize(14)
                 .fontColor('#333333')
                 .fontWeight(FontWeight.Medium)
@@ -380,12 +393,16 @@ struct EmotionReportPage {
 
   async loadReport() {
     this.isLoading = true;
+    this.reportHint = '正在为你整理这段时间的情绪变化';
 
     try {
+      await apiService.ensureAnonymousUser();
       this.report = await apiService.getEmotionReport(this.days);
+      this.reportHint = '报告已更新';
     } catch (error) {
       console.error('Failed to load report:', error);
       this.report = null;
+      this.reportHint = '加载失败，请稍后再试';
     } finally {
       this.isLoading = false;
     }

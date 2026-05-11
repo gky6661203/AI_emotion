@@ -28,7 +28,7 @@ struct TreeHole {
       this.letters = result.letters;
       this.statusText = this.letters.length > 0 ? `已加载 ${this.letters.length} 封树洞` : '还没有树洞';
     } catch (error) {
-      this.statusText = '加载失败，请检查后端是否启动';
+      this.statusText = '加载失败，先稍后再试';
       console.error('Failed to load letters:', error);
     }
   }
@@ -75,14 +75,14 @@ struct TreeHole {
       }
       .width('100%')
       .height(56)
-      .backgroundColor('#FFFFFF')
+      .backgroundColor('#F4F1FF')
       .shadow({ radius: 4, color: 'rgba(0,0,0,0.05)', offsetY: 2 })
 
       Scroll() {
         Column() {
           Column() {
             Row() {
-              Text(this.isEditing ? '编辑树洞' : '写下一点心事')
+              Text(this.isEditing ? '编辑树洞' : '写下此刻的心事')
                 .fontSize(18)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#333333')
@@ -177,15 +177,17 @@ struct TreeHole {
 
           if (this.letters.length === 0) {
             Column() {
-              Text('📮')
-                .fontSize(60)
-                .margin({ top: 18 })
+              Image($r('app.media.cat'))
+                .width(120)
+                .height(120)
+                .objectFit(ImageFit.Contain)
+                .margin({ top: 8 })
               Text('还没有树洞')
                 .fontSize(18)
                 .fontColor('#666666')
                 .fontWeight(FontWeight.Medium)
                 .margin({ top: 10 })
-              Text('写下你的第一个心事吧')
+              Text('先写下今天的一点点感受吧')
                 .fontSize(14)
                 .fontColor('#999999')
                 .margin({ top: 8 })
@@ -264,6 +266,12 @@ struct TreeHole {
           .fontColor('#4A90D9')
           .margin({ left: 12 })
           .onClick(() => this.startEdit(letter))
+
+        Text('详情')
+          .fontSize(12)
+          .fontColor('#7B57FF')
+          .margin({ left: 12 })
+          .onClick(() => router.pushUrl({ url: 'pages/TreeHoleDetail', params: { letterId: letter.id } }))
 
         Text('删除')
           .fontSize(12)

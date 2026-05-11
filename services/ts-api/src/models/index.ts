@@ -186,6 +186,23 @@ export interface PostReport {
   status: string;
   created_at: string;
 }
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  ai_summary?: string;
+  keywords?: string[];
+  emotion?: string;
+  emotion_intensity?: number;
+  risk_level?: string;
+  moderation_status: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
 export interface EmotionReport {
   user_id: string;
   period_start: string;

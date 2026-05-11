@@ -18,6 +18,7 @@
     { "name": "tab_pour", "value": "倾诉" },
     { "name": "tab_discover", "value": "发现" },
     { "name": "tab_mine", "value": "我的" },
-    { "name": "reason_internet", "value": "用于连接服务器以提供AI情感分析与陪伴服务" }
+    { "name": "reason_internet", "value": "用于连接服务器以提供AI情感分析与陪伴服务" },
+    { "name": "reason_microphone", "value": "用于录音和语音陪伴功能" }
   ]
 }

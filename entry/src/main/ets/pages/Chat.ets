@@ -25,6 +25,7 @@ struct Chat {
   @State emotionHint: string = '你可以从一句“我今天有点累”开始。';
   @State showSafetyHelp: boolean = false;
   @State safetyMessage: string = '如果你现在很难受，请优先联系现实中的可信任支持者。';
+  @State isAssistantTyping: boolean = false;
   scroller: Scroller = new Scroller();
 
   aboutToAppear() {
@@ -37,14 +38,7 @@ struct Chat {
       let result = await apiService.listMessages(50);
       this.messages = result.messages;
       if (this.messages.length === 0) {
-        this.messages = [{
-          id: '',
-          user_id: '',
-          role: 'assistant',
-          content: '你好，我在这里。你可以从一句“我今天有点累”开始。',
-          content_type: 'text',
-          created_at: new Date().toISOString()
-        }];
+        this.messages = [this.createChatMessage('assistant', '你好，我在这里。你可以从一句“我今天有点累”开始。')];
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -132,7 +126,7 @@ struct Chat {
 
       // Messages List
       List({ scroller: this.scroller }) {
-        ForEach(this.messages, (msg: ChatMessage, index: number) => {
+        ForEach(this.messages, (msg: ChatMessage) => {
           ListItem() {
             if (msg.role === 'user') {
               this.UserMessage(msg.content)
@@ -141,11 +135,26 @@ struct Chat {
             }
           }
         })
+
+        if (this.isAssistantTyping) {
+          ListItem() {
+            this.TypingIndicator()
+          }
+        }
       }
       .width('100%')
       .layoutWeight(1)
       .padding({ left: 12, right: 12, top: 10 })
       .backgroundColor('#F8F9FA')
+
+      if (this.isAssistantTyping) {
+        Row() {
+          this.TypingIndicator()
+        }
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 4 })
+        .backgroundColor('#F8F9FA')
+      }
 
       Row() {
         this.QuickEmotion('有点累')
@@ -164,23 +173,7 @@ struct Chat {
             .fontColor('#D9534F')
           Row() {
             Button('写入树洞').onClick(() => router.pushUrl({ url: 'pages/TreeHole' }))
-            Button('安全帮助').margin({ left: 8 }).onClick(async () => {
-              this.showSafetyHelp = true;
-              try {
-                const resources = await apiService.getSafetyResources();
-                if (resources.message) {
-                  this.safetyMessage = resources.message;
-                  this.emotionHint = resources.message;
-                  promptAction.showToast({ message: resources.message });
-                } else {
-                  this.safetyMessage = '已为你准备安全帮助资源';
-                  promptAction.showToast({ message: '已为你准备安全帮助资源' });
-                }
-              } catch {
-                this.safetyMessage = '请优先联系现实中的可信任支持者';
-                promptAction.showToast({ message: '请优先联系现实中的可信任支持者' });
-              }
-            })
+            Button('安全帮助').margin({ left: 8 }).onClick(() => this.openSafetyHelp())
           }.margin({ top: 8 })
           Text(this.safetyMessage).fontSize(12).fontColor('#B94A48').margin({ top: 8 })
         }.width('100%').padding(10).backgroundColor('#FFF3F3')
@@ -240,6 +233,7 @@ struct Chat {
       .margin({ right: 8 })
       .onClick(() => {
         this.inputText = text;
+        this.sendMessage();
       })
   }
 
@@ -291,10 +285,14 @@ struct Chat {
       .alignItems(HorizontalAlign.Center)
 
       Column() {
-        Text(content)
-          .fontSize(15)
-          .fontColor('#333333')
-          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        ForEach(this.splitMessage(content), (line: string) => {
+          Text(line)
+            .fontSize(15)
+            .fontColor('#333333')
+            .lineHeight(22)
+            .padding({ bottom: 4 })
+            .width('100%')
+        })
       }
       .backgroundColor('#FFFFFF')
       .borderRadius(18)
@@ -305,6 +303,7 @@ struct Chat {
         bottomRight: 18
       })
       .constraintSize({ maxWidth: '280vp' })
+      .padding({ left: 14, right: 14, top: 10, bottom: 8 })
       .shadow({
         radius: 8,
         color: 'rgba(0,0,0,0.06)',
@@ -316,6 +315,34 @@ struct Chat {
     .width('100%')
     .justifyContent(FlexAlign.Start)
     .alignItems(VerticalAlign.Top)
+  }
+
+  private openSafetyHelp() {
+    this.showSafetyHelp = true;
+    apiService.getSafetyResources().then((resources) => {
+      if (resources.message) {
+        this.safetyMessage = resources.message;
+        this.emotionHint = resources.message;
+        promptAction.showToast({ message: resources.message });
+      } else {
+        this.safetyMessage = '已为你准备安全帮助资源';
+        promptAction.showToast({ message: '已为你准备安全帮助资源' });
+      }
+    }).catch(() => {
+      this.safetyMessage = '请优先联系现实中的可信任支持者';
+      promptAction.showToast({ message: '请优先联系现实中的可信任支持者' });
+    });
+  }
+
+  private createChatMessage(role: string, content: string): ChatMessage {
+    return {
+      id: '',
+      user_id: '',
+      role: role,
+      content: content,
+      content_type: 'text',
+      created_at: new Date().toISOString()
+    };
   }
 
   async sendMessage() {
@@ -334,36 +361,59 @@ struct Chat {
     let text = this.inputText;
     this.inputText = '';
     this.isLoading = true;
-
-    let aiMessage: ChatMessage = {
-      id: '',
-      user_id: '',
-      role: 'assistant',
-      content: '思考中...',
-      content_type: 'text',
-      created_at: new Date().toISOString()
-    };
-    this.messages.push(aiMessage);
+    this.isAssistantTyping = true;
 
     try {
       let response = await apiService.sendMessage(text);
       this.updateAnalysis(response as EmotionAnalysisCarrier);
-      let lastIndex = this.messages.length - 1;
-      if (lastIndex >= 0 && this.messages[lastIndex].role === 'assistant') {
-        if (response.ai_response) {
-          this.messages[lastIndex] = response.ai_response;
-        } else {
-          this.messages[lastIndex].content = response.message.content;
-        }
-      }
+      let aiContent = response.ai_response?.content || response.message.content || '谢谢你愿意和我说这些。';
+      this.messages.push(this.createChatMessage('assistant', aiContent));
     } catch (error) {
-      let lastIndex = this.messages.length - 1;
-      if (lastIndex >= 0 && this.messages[lastIndex].role === 'assistant') {
-        this.messages[lastIndex].content = '抱歉，AI 服务暂时不可用。请稍后再试。';
-      }
+      this.messages.push(this.createChatMessage('assistant', '抱歉，AI 服务暂时不可用。请稍后再试。'));
     } finally {
       this.isLoading = false;
+      this.isAssistantTyping = false;
       this.scroller.scrollToIndex(this.messages.length - 1);
     }
+  }
+
+  @Builder
+  TypingIndicator() {
+    Row() {
+      Column() {
+        Text('🤖')
+          .fontSize(24)
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#FFFFFF')
+      .borderRadius(20)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .shadow({
+        radius: 6,
+        color: 'rgba(0,0,0,0.08)',
+        offsetX: 0,
+        offsetY: 2
+      })
+
+      Row() {
+        Text('正在思考')
+          .fontSize(14)
+          .fontColor('#666666')
+          .margin({ right: 8 })
+        LoadingProgress().width(18).height(18)
+      }
+      .backgroundColor('#FFFFFF')
+      .borderRadius(18)
+      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      .margin({ left: 8, bottom: 6 })
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.Start)
+  }
+
+  private splitMessage(content: string): string[] {
+    return (content || '').split(/\n+/).filter((line: string) => line.trim().length > 0);
   }
 }

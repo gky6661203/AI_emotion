@@ -48,6 +48,116 @@ interface SafetyResourcesResponse {
   message?: string;
 }
 
+interface ProfilePreferenceSignals {
+  prefersDirectAdvice: boolean;
+  prefersVoice: boolean;
+  prefersPrivateWriting: boolean;
+  openToPublicInteraction: boolean;
+  safetySensitive: boolean;
+}
+
+interface ProfileStateVector {
+  valence: number;
+  arousal: number;
+  dominance: number;
+  social: number;
+  cognitive: number;
+}
+
+interface ProfileCounts {
+  emotion_records: number;
+  posts: number;
+  letters: number;
+  voices: number;
+}
+
+interface TimelineStateVector {
+  valence: number;
+  arousal: number;
+  dominance: number;
+  social: number;
+  cognitive: number;
+}
+
+interface TimelineCounts {
+  emotion_records: number;
+  posts: number;
+  letters: number;
+  voices: number;
+}
+
+interface ProfileTimelineItem {
+  snapshot_date?: string;
+  dominant_emotion: string;
+  average_intensity: number;
+  risk_rate: number;
+  signal_summary: string;
+  state_vector: TimelineStateVector;
+  counts: TimelineCounts;
+  created_at?: string;
+}
+
+interface ProfileTimelineResponse {
+  timeline: ProfileTimelineItem[];
+}
+
+interface RecommendationFeedbackItem {
+  recommendation_type: string;
+  title?: string;
+  feedback: string;
+  rating?: number;
+  context?: string;
+  created_at: string;
+}
+
+interface RecommendationFeedbackResponse {
+  success: boolean;
+  feedback_id?: string;
+}
+
+interface MatchSuggestionItem {
+  user_id: string;
+  dominant_emotion: string;
+  signal_summary: string;
+  score: number;
+  reason: string;
+}
+
+interface ProfileOverviewResponse {
+  user_id: string;
+  dominant_emotion: string;
+  average_intensity: number;
+  risk_rate: number;
+  signal_summary: string;
+  preferred_day?: string;
+  preference_signals: ProfilePreferenceSignals;
+  state_vector: ProfileStateVector;
+  counts: ProfileCounts;
+  risk_count?: number;
+}
+
+interface MatchSuggestionsResponse {
+  suggestions: MatchSuggestionItem[];
+  profile?: ProfileOverviewResponse;
+}
+
+interface MatchRequestResponse {
+  success: boolean;
+  request_id?: string;
+}
+
+interface MatchRequestItem {
+  id: string;
+  match_type: string;
+  note?: string;
+  status: string;
+  created_at: string;
+}
+
+interface MatchRequestListResponse {
+  requests: MatchRequestItem[];
+}
+
 interface MessagesResponse {
   messages: ChatMessage[];
 }
@@ -92,6 +202,14 @@ interface GetRecommendationsResponse {
   risk_level?: string;
 }
 
+interface ProfileHighlights {
+  active_content_count: number;
+  risk_count: number;
+  allow_comment_posts: number;
+  voice_allowed_count: number;
+  letter_profile_write_count: number;
+}
+
 interface TrendsResponse {
   trends: EmotionTrendItem[];
 }
@@ -100,6 +218,7 @@ interface HttpResponseData {
   responseCode: number;
   result: string | ArrayBuffer | undefined;
 }
+
 
 interface AnonymousRequest {
   campus?: string;
@@ -176,6 +295,58 @@ interface CreatePostRequest {
 
 interface AddReactionRequest {
   type: string;
+}
+
+interface ReportPostRequest {
+  reason: string;
+  description?: string;
+}
+
+interface ReportPostResponse {
+  success: boolean;
+}
+
+interface CommentItem {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+interface CommentsResponse {
+  comments: CommentItem[];
+}
+
+interface CreateCommentBody {
+  content: string;
+}
+
+interface CreateCommentResponse {
+  comment: CommentItem;
+}
+
+interface CreateProfileSnapshotResponse {
+  success: boolean;
+  snapshot: ProfileOverviewResponse;
+}
+
+interface RecommendationFeedbackBody {
+  recommendation_type: string;
+  title?: string;
+  feedback: string;
+  rating?: number;
+  context?: string;
+}
+
+interface MatchRequestBody {
+  match_type: string;
+  note?: string;
+}
+
+interface CloseMatchRequestBody {
+  request_id: string;
 }
 
 const DEFAULT_BASE_URL = 'http://172.26.48.1:8080';
@@ -289,7 +460,7 @@ export class ApiService {
       enrollment_year: enrollmentYear
     };
     let result = await this.request<CreateAnonymousResponse>('POST', '/api/auth/anonymous', body);
-    this.token = result.token;
+    this.setToken(result.token);
     return result;
   }
 
@@ -300,14 +471,14 @@ export class ApiService {
   async register(account: string, password: string, nickname?: string, campus?: string, enrollmentYear?: number): Promise<AuthResponse> {
     let body: RegisterRequest = { account: account, password: password, nickname: nickname, campus: campus, enrollment_year: enrollmentYear };
     let result = await this.request<AuthResponse>('POST', '/api/auth/register', body);
-    this.token = result.token;
+    this.setToken(result.token);
     return result;
   }
 
   async login(account: string, password: string): Promise<AuthResponse> {
     let body: LoginRequest = { account: account, password: password };
     let result = await this.request<AuthResponse>('POST', '/api/auth/login', body);
-    this.token = result.token;
+    this.setToken(result.token);
     return result;
   }
 
@@ -427,6 +598,47 @@ export class ApiService {
     return this.request<GetRecommendationsResponse>('GET', `/api/recommendations/current?limit=${limit || 5}`);
   }
 
+  async getProfileOverview(): Promise<ProfileOverviewResponse> {
+    return this.request<ProfileOverviewResponse>('GET', '/api/profile/overview');
+  }
+
+  async createProfileSnapshot(): Promise<CreateProfileSnapshotResponse> {
+    return this.request<CreateProfileSnapshotResponse>('POST', '/api/profile/snapshot');
+  }
+
+  async getProfileTimeline(days?: number): Promise<ProfileTimelineResponse> {
+    return this.request<ProfileTimelineResponse>('GET', `/api/profile/timeline?days=${days || 14}`);
+  }
+
+  async sendRecommendationFeedback(recommendationType: string, feedback: string, title?: string, rating?: number, context?: string): Promise<RecommendationFeedbackResponse> {
+    let body: RecommendationFeedbackBody = {
+      recommendation_type: recommendationType,
+      title: title,
+      feedback: feedback,
+      rating: rating,
+      context: context
+    };
+    return this.request<RecommendationFeedbackResponse>('POST', '/api/recommendations/feedback', body);
+  }
+
+  async getMatchSuggestions(limit?: number): Promise<MatchSuggestionsResponse> {
+    return this.request<MatchSuggestionsResponse>('GET', `/api/match/suggestions?limit=${limit || 5}`);
+  }
+
+  async createMatchRequest(matchType: string, note?: string): Promise<MatchRequestResponse> {
+    let body: MatchRequestBody = { match_type: matchType, note: note };
+    return this.request<MatchRequestResponse>('POST', '/api/match/request', body);
+  }
+
+  async closeMatchRequest(requestId: string): Promise<SuccessResponse> {
+    let body: CloseMatchRequestBody = { request_id: requestId };
+    return this.request<SuccessResponse>('POST', '/api/match/close', body);
+  }
+
+  async listMatchRequests(): Promise<MatchRequestListResponse> {
+    return this.request<MatchRequestListResponse>('GET', '/api/match/requests');
+  }
+
   async getTodayEmotion(): Promise<EmotionReport> {
     return this.request<EmotionReport>('GET', '/api/emotions/today');
   }
@@ -450,6 +662,7 @@ export class ApiService {
       title: title,
       allow_comments: allowComments
     };
+    await this.ensureAnonymousUser();
     return this.request<PostResponse>('POST', '/api/posts', body);
   }
 
@@ -457,7 +670,35 @@ export class ApiService {
     let body: AddReactionRequest = {
       type: type
     };
+    await this.ensureAnonymousUser();
     return this.request<SuccessResponse>('POST', `/api/posts/${postId}/reactions`, body);
+  }
+
+  async deletePost(postId: string): Promise<SuccessResponse> {
+    return this.request<SuccessResponse>('DELETE', `/api/posts/${postId}`);
+  }
+
+  async reportPost(postId: string, reason: string, description?: string): Promise<ReportPostResponse> {
+    let body: ReportPostRequest = {
+      reason: reason,
+      description: description
+    };
+    await this.ensureAnonymousUser();
+    return this.request<ReportPostResponse>('POST', `/api/posts/${postId}/report`, body);
+  }
+
+  async listComments(postId: string): Promise<CommentsResponse> {
+    await this.ensureAnonymousUser();
+    return this.request<CommentsResponse>('GET', `/api/posts/${postId}/comments`);
+  }
+
+  async createComment(postId: string, content: string): Promise<CreateCommentResponse> {
+    let body: CreateCommentBody = { content: content };
+    return this.request<CreateCommentResponse>('POST', `/api/posts/${postId}/comments`, body);
+  }
+
+  async deleteComment(postId: string, commentId: string): Promise<SuccessResponse> {
+    return this.request<SuccessResponse>('DELETE', `/api/posts/${postId}/comments/${commentId}`);
   }
 }
 

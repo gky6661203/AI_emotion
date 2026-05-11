@@ -37,8 +37,10 @@ if ($ResetData) {
 
 if ($Rebuild) {
     Write-Host 'Rebuilding images...' -ForegroundColor Yellow
+    Invoke-Compose -Args @('up', '-d', '--build')
+} else {
+    Invoke-Compose -Args @('up', '-d')
 }
-Invoke-Compose -Args @('up', '-d', '--build')
 
 Write-Host 'Waiting for backend health check...' -ForegroundColor Yellow
 $healthOk = $false
@@ -61,8 +63,8 @@ if ($healthOk) {
     Write-Host 'Backend containers started, but health check did not respond yet.' -ForegroundColor Yellow
 }
 Write-Host 'Useful URLs:' -ForegroundColor Green
-Write-Host '  API:       http://172.26.48.1:8080' -ForegroundColor Gray
-Write-Host '  Health:    http://172.26.48.1:8080/health' -ForegroundColor Gray
+Write-Host '  API:       http://localhost:8080' -ForegroundColor Gray
+Write-Host '  Health:    http://localhost:8080/health' -ForegroundColor Gray
 Write-Host '  Postgres:  localhost:5432' -ForegroundColor Gray
 Write-Host '  Stop:      .\scripts\stop-backend.ps1' -ForegroundColor Gray
 Write-Host '  Status:    .\scripts\status-backend.ps1' -ForegroundColor Gray

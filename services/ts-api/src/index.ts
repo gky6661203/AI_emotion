@@ -10,9 +10,15 @@ import devicesRoutes from './routes/devices';
 import chatRoutes from './routes/chat';
 import lettersRoutes from './routes/letters';
 import postsRoutes from './routes/posts';
+import postCommentsRoutes from './routes/postComments';
 import voiceRoutes from './routes/voice';
 import emotionsRoutes from './routes/emotions';
 import recommendationsRoutes from './routes/recommendations';
+import recommendationFeedbackRoutes from './routes/recommendationFeedback';
+import profileRoutes from './routes/profile';
+import profileSnapshotsRoutes from './routes/profileSnapshots';
+import matchRoutes from './routes/match';
+import safetyRoutes from './routes/safety';
 
 dotenv.config();
 
@@ -34,9 +40,15 @@ initDatabase().then(() => {
   app.use('/api/chat', chatRoutes);
   app.use('/api/private-letters', lettersRoutes);
   app.use('/api/posts', postsRoutes);
+  app.use('/api/posts', postCommentsRoutes);
   app.use('/api/voice-records', voiceRoutes);
   app.use('/api/emotions', emotionsRoutes);
   app.use('/api/recommendations', recommendationsRoutes);
+  app.use('/api/recommendations/feedback', recommendationFeedbackRoutes);
+  app.use('/api/profile', profileRoutes);
+  app.use('/api/profile', profileSnapshotsRoutes);
+  app.use('/api/match', matchRoutes);
+  app.use('/api/safety', safetyRoutes);
 
   app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error('Unhandled error:', err);

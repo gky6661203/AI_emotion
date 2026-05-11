@@ -32,6 +32,14 @@ export interface EmotionAnalysis {
   risk_types: string[];
 }
 
+export interface ProfileStateVector {
+  valence: number;
+  arousal: number;
+  dominance: number;
+  social: number;
+  cognitive: number;
+}
+
 export interface ChatMessage {
   id: string;
   user_id: string;
@@ -41,6 +49,11 @@ export interface ChatMessage {
   content_type: string;
   message_metadata?: object;
   created_at: string;
+}
+
+export interface LetterEmotionAnalysis {
+  summary?: string;
+  keywords?: string[];
 }
 
 export interface PrivateLetter {
@@ -54,6 +67,7 @@ export interface PrivateLetter {
   keywords?: string[];
   emotion?: string;
   emotion_intensity?: number;
+  emotion_analysis?: LetterEmotionAnalysis;
   write_to_emotion_profile: boolean;
   affect_recommendation?: object;
   affect_matching?: object;
