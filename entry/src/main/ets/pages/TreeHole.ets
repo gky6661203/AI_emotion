@@ -52,7 +52,13 @@ struct TreeHole {
           .fillColor('#333333')
           .rotate({ angle: 180 })
           .margin({ left: 15 })
-          .onClick(() => router.back())
+          .onClick(() => {
+            try {
+              router.back();
+            } catch (err) {
+              console.error('back failed', err);
+            }
+          })
 
         Text('私密树洞')
           .fontSize(18)
@@ -271,7 +277,13 @@ struct TreeHole {
           .fontSize(12)
           .fontColor('#7B57FF')
           .margin({ left: 12 })
-          .onClick(() => router.pushUrl({ url: 'pages/TreeHoleDetail', params: { letterId: letter.id } }))
+          .onClick(() => {
+            try {
+              router.pushUrl({ url: 'pages/TreeHoleDetail', params: { letterId: letter.id } });
+            } catch (err) {
+              console.error('pushUrl failed', err);
+            }
+          })
 
         Text('删除')
           .fontSize(12)
@@ -294,7 +306,11 @@ struct TreeHole {
   async createLetter() {
     if (!this.newContent.trim()) {
       this.statusText = '请输入内容后再发布';
-      promptAction.showToast({ message: '请输入内容' });
+      try {
+        promptAction.showToast({ message: '请输入内容' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
       return;
     }
 
@@ -307,11 +323,19 @@ struct TreeHole {
       if (this.isEditing && this.editingId) {
         let result = await apiService.updateLetter(this.editingId, this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
         this.letters = this.letters.map(item => item.id === this.editingId ? result.letter : item);
-        promptAction.showToast({ message: '树洞已更新' });
+        try {
+          promptAction.showToast({ message: '树洞已更新' });
+        } catch (err) {
+          console.error('showToast failed', err);
+        }
       } else {
         let result = await apiService.createLetter(this.newContent, this.newTitle || undefined, this.allowAiAnalysis, this.writeToProfile);
         this.letters.unshift(result.letter);
-        promptAction.showToast({ message: '树洞已发布' });
+        try {
+          promptAction.showToast({ message: '树洞已发布' });
+        } catch (err) {
+          console.error('showToast failed', err);
+        }
       }
       this.newTitle = '';
       this.newContent = '';
@@ -320,7 +344,11 @@ struct TreeHole {
       this.statusText = '保存成功';
     } catch (error) {
       this.statusText = '保存失败，请检查后端连接';
-      promptAction.showToast({ message: '保存失败' });
+      try {
+        promptAction.showToast({ message: '保存失败' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
       console.error('Failed to create/update letter:', error);
     } finally {
       this.isLoading = false;

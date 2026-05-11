@@ -27,8 +27,13 @@ struct PostDetail {
     interface PostParams {
       postId?: string;
     }
-    const params = router.getParams() as PostParams;
-    this.postId = params?.postId || '';
+    try {
+      const params = router.getParams() as PostParams;
+      this.postId = params?.postId || '';
+    } catch (err) {
+      console.error('getParams failed', err);
+      this.postId = '';
+    }
     this.load();
   }
 
@@ -58,17 +63,29 @@ struct PostDetail {
 
   async sendComment() {
     if (!this.newComment.trim()) {
-      promptAction.showToast({ message: '请先写一点内容' });
+      try {
+        promptAction.showToast({ message: '请先写一点内容' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
       return;
     }
     try {
       await apiService.createComment(this.postId, this.newComment.trim());
       this.newComment = '';
       await this.load();
-      promptAction.showToast({ message: '评论已发布' });
+      try {
+        promptAction.showToast({ message: '评论已发布' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     } catch (error) {
       console.error('Create comment failed:', error);
-      promptAction.showToast({ message: '评论发布失败' });
+      try {
+        promptAction.showToast({ message: '评论发布失败' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     }
   }
 
@@ -76,10 +93,18 @@ struct PostDetail {
     try {
       await apiService.deleteComment(this.postId, commentId);
       await this.load();
-      promptAction.showToast({ message: '评论已删除' });
+      try {
+        promptAction.showToast({ message: '评论已删除' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     } catch (error) {
       console.error('Delete comment failed:', error);
-      promptAction.showToast({ message: '删除失败' });
+      try {
+        promptAction.showToast({ message: '删除失败' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     }
   }
 
@@ -89,7 +114,13 @@ struct PostDetail {
         Text('帖子详情').fontSize(20).fontWeight(FontWeight.Bold)
         Blank()
         Text(this.postStatus).fontSize(11).fontColor('#8B849B').margin({ right: 12 })
-        Button('返回').onClick(() => router.back())
+        Button('返回').onClick(() => {
+          try {
+            router.back();
+          } catch (err) {
+            console.error('back failed', err);
+          }
+        })
       }.width('100%').padding(16)
 
       if (this.isLoading) {

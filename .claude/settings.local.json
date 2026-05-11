@@ -29,7 +29,10 @@
       "Bash(taskkill //F //PID 26364)",
       "Bash(kill -9 26364)",
       "Bash(nohup npm *)",
-      "Bash(npm start *)"
+      "Bash(npm start *)",
+      "Bash(ipconfig)",
+      "Read(//c/Users/32328/.docker/**)",
+      "Read(//etc/docker/**)"
     ]
   }
 }

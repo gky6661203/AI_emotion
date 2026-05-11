@@ -77,7 +77,13 @@ struct Chat {
           .fillColor('#333333')
           .rotate({ angle: 180 })
           .margin({ left: 15 })
-          .onClick(() => router.back())
+          .onClick(() => {
+            try {
+              router.back();
+            } catch (err) {
+              console.error('back failed', err);
+            }
+          })
 
         Text('AI 陪伴')
           .fontSize(18)
@@ -172,7 +178,13 @@ struct Chat {
             .fontSize(12)
             .fontColor('#D9534F')
           Row() {
-            Button('写入树洞').onClick(() => router.pushUrl({ url: 'pages/TreeHole' }))
+            Button('写入树洞').onClick(() => {
+              try {
+                router.pushUrl({ url: 'pages/TreeHole' });
+              } catch (err) {
+                console.error('pushUrl failed', err);
+              }
+            })
             Button('安全帮助').margin({ left: 8 }).onClick(() => this.openSafetyHelp())
           }.margin({ top: 8 })
           Text(this.safetyMessage).fontSize(12).fontColor('#B94A48').margin({ top: 8 })
@@ -183,13 +195,14 @@ struct Chat {
       Column() {
         Row() {
           TextInput({ placeholder: '输入消息...', text: this.inputText })
-            .width('100%')
-            .height(44)
-            .backgroundColor('#F5F5F5')
-            .borderRadius(22)
+            .layoutWeight(1)
+            .height(46)
+            .backgroundColor('#F5F2FF')
+            .borderRadius(23)
             .padding({ left: 18, right: 18 })
             .fontSize(15)
-            .placeholderColor('#999999')
+            .fontColor('#201B34')
+            .placeholderColor('#9A93AA')
             .onChange((value: string) => {
               this.inputText = value;
             })
@@ -202,21 +215,25 @@ struct Chat {
                 .color('#FFFFFF')
             } else {
               Text('发送')
-                .fontSize(13)
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
                 .fontColor('#FFFFFF')
             }
           }
-          .width(44)
-          .height(44)
-          .backgroundColor(this.inputText.length > 0 ? '#4A90D9' : '#CCCCCC')
-          .borderRadius(22)
+          .width(72)
+          .height(46)
+          .backgroundColor(this.inputText.trim().length > 0 ? '#7658F6' : '#C9C2D8')
+          .borderRadius(23)
           .margin({ left: 10 })
-          .enabled(this.inputText.length > 0 && !this.isLoading)
+          .shadow({ radius: this.inputText.trim().length > 0 ? 12 : 0, color: '#7658F644', offsetY: 4 })
+          .enabled(this.inputText.trim().length > 0 && !this.isLoading)
           .onClick(() => this.sendMessage())
         }
-        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 10, bottom: 12 })
         .backgroundColor('#FFFFFF')
       }
+      .width('100%')
     }
     .width('100%')
     .height('100%')
@@ -323,14 +340,26 @@ struct Chat {
       if (resources.message) {
         this.safetyMessage = resources.message;
         this.emotionHint = resources.message;
-        promptAction.showToast({ message: resources.message });
+        try {
+          promptAction.showToast({ message: resources.message });
+        } catch (err) {
+          console.error('showToast failed', err);
+        }
       } else {
         this.safetyMessage = '已为你准备安全帮助资源';
-        promptAction.showToast({ message: '已为你准备安全帮助资源' });
+        try {
+          promptAction.showToast({ message: '已为你准备安全帮助资源' });
+        } catch (err) {
+          console.error('showToast failed', err);
+        }
       }
     }).catch(() => {
       this.safetyMessage = '请优先联系现实中的可信任支持者';
-      promptAction.showToast({ message: '请优先联系现实中的可信任支持者' });
+      try {
+        promptAction.showToast({ message: '请优先联系现实中的可信任支持者' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     });
   }
 

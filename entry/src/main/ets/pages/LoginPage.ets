@@ -15,7 +15,7 @@ struct LoginPage {
   @State password: string = '';
   @State nickname: string = '';
   @State confirmPassword: string = '';
-  @State backendUrl: string = 'http://172.26.48.1:8080';
+  @State backendUrl: string = 'http://10.16.106.237:8080';
   @State isRegisterMode: boolean = false;
   @State isLoading: boolean = false;
   @State isPressed: boolean = false;
@@ -76,7 +76,11 @@ struct LoginPage {
       let result = await apiService.login(this.account.trim(), this.password);
       apiService.setToken(result.token);
       await apiService.getMe();
-      router.replaceUrl({ url: 'pages/Index' });
+      try {
+        router.replaceUrl({ url: 'pages/Index' });
+      } catch (err) {
+        console.error('replaceUrl failed', err);
+      }
     } catch (err) {
       this.errorMsg = this.formatError(err as Error | string | object, '登录失败，请检查用户名和密码');
     } finally {
@@ -108,7 +112,11 @@ struct LoginPage {
       let result = await apiService.register(this.account.trim(), this.password, this.nickname);
       apiService.setToken(result.token);
       await apiService.getMe();
-      router.replaceUrl({ url: 'pages/Index' });
+      try {
+        router.replaceUrl({ url: 'pages/Index' });
+      } catch (err) {
+        console.error('replaceUrl failed', err);
+      }
     } catch (err) {
       const message = this.formatError(err as Error | string | object, '注册失败');
       if (message.includes('409') || message.includes('已被注册') || message.includes('duplicate')) {
@@ -220,8 +228,16 @@ struct LoginPage {
                   try {
                     let result = await apiService.createAnonymous();
                     apiService.setToken(result.token);
-                    promptAction.showToast({ message: '已进入匿名体验' });
-                    router.replaceUrl({ url: 'pages/Index' });
+                    try {
+                      promptAction.showToast({ message: '已进入匿名体验' });
+                    } catch (err) {
+                      console.error('showToast failed', err);
+                    }
+                    try {
+                      router.replaceUrl({ url: 'pages/Index' });
+                    } catch (err) {
+                      console.error('replaceUrl failed', err);
+                    }
                   } catch (err) {
                     this.errorMsg = this.formatError(err as Error | string | object, '匿名体验失败');
                   } finally {

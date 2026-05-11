@@ -349,7 +349,7 @@ interface CloseMatchRequestBody {
   request_id: string;
 }
 
-const DEFAULT_BASE_URL = 'http://172.26.48.1:8080';
+const DEFAULT_BASE_URL = 'http://10.16.106.237:8080';
 const TIMEOUT = 30000;
 const AUTH_TOKEN_KEY = 'aiemotion_auth_token';
 
@@ -360,7 +360,7 @@ export class ApiService {
   setToken(token: string): void {
     this.token = token;
     try {
-      AppStorage.SetOrCreate(AUTH_TOKEN_KEY, token);
+      AppStorage.setOrCreate(AUTH_TOKEN_KEY, token);
     } catch (err) {
       console.error('persist token failed', err);
     }
@@ -369,7 +369,7 @@ export class ApiService {
   getToken(): string {
     if (!this.token) {
       try {
-        let stored = AppStorage.Get<string>(AUTH_TOKEN_KEY);
+        let stored = AppStorage.get<string>(AUTH_TOKEN_KEY);
         if (typeof stored === 'string') {
           this.token = stored;
         }

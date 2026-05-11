@@ -7,7 +7,16 @@ interface EmotionReportResult extends EmotionReport {
   risk_level?: string;
 }
 
-interface GeneratedTypeLiteralInterface_2 {
+interface FeatureEntry {
+  title: string;
+  desc: string;
+  icon: string;
+  tint: string;
+  url: string;
+  featureName: string;
+}
+
+interface FutureAction {
   title: string;
   desc: string;
   url: string;
@@ -21,15 +30,6 @@ interface PushUrlOptions {
   url: string;
 }
 
-interface ProfilePreferences {
-  prefersDirectAdvice: boolean;
-  prefersVoice: boolean;
-  prefersPrivateWriting: boolean;
-  openToPublicInteraction: boolean;
-  safetySensitive: boolean;
-}
-
-
 @Entry
 @Component
 struct Index {
@@ -37,7 +37,6 @@ struct Index {
   @State emotion: string = '平静';
   @State care: string = '检测到你最近有些疲惫，要不要试试放松一下？';
   @State guestLimitText: string = '游客模式无法保存记录，登录账号可解锁完整树洞功能';
-  @State deviceAlertText: string = '多设备已连接，建议立即管理设备，避免账号风险';
   @State currentStatusHint: string = '暂无情绪记录，点击下方开始倾诉吧';
   @State tag: number = 0;
   @State currentUser: User | null = null;
@@ -59,7 +58,16 @@ struct Index {
     cognitive: 0
   };
   @State profileSignalsText: string = '偏好信号正在计算';
-  @State recentActions: Array<GeneratedTypeLiteralInterface_2> = [
+  @State isHeroPressed: boolean = false;
+  @State selectedOrb: number = 0;
+  @State cardLift: boolean = false;
+  @State glowPhase: number = 0;
+  @State featureEntries: FeatureEntry[] = [
+    { title: '无压力倾诉', desc: '安心表达', icon: '♥', tint: '#FF7DB7', url: 'pages/Chat', featureName: '倾诉' },
+    { title: 'AI共情陪伴', desc: '温暖回应', icon: '✦', tint: '#6F62FF', url: 'pages/Chat', featureName: '倾诉' },
+    { title: '隐私安全', desc: '严格保护', icon: '▣', tint: '#31C96A', url: 'pages/SafetyHelp', featureName: '安全帮助' }
+  ];
+  @State recentActions: FutureAction[] = [
     { title: '去树洞记录', desc: '把刚刚的情绪放进安全空间', url: 'pages/TreeHole' },
     { title: '查看搭子匹配', desc: '看看当前画像适合怎样的搭子', url: 'pages/MatchPage' },
     { title: '打开安全帮助', desc: '当需要稳住当下时先来这里', url: 'pages/SafetyHelp' }
@@ -67,6 +75,14 @@ struct Index {
 
   aboutToAppear() {
     this.load();
+    try {
+      animateTo({ duration: 1500, curve: Curve.EaseInOut, iterations: -1, playMode: PlayMode.Alternate }, () => {
+        this.glowPhase = 1;
+        this.cardLift = true;
+      });
+    } catch (err) {
+      console.error('animateTo failed', err);
+    }
   }
 
   async load() {
@@ -102,34 +118,13 @@ struct Index {
           social: profile.state_vector.social,
           cognitive: profile.state_vector.cognitive
         };
-        this.profileSignalsText = profile.preference_signals.prefersVoice
-          ? '更偏好语音表达'
-          : profile.preference_signals.prefersPrivateWriting
-            ? '更偏好私密写作'
-            : profile.preference_signals.prefersDirectAdvice
-              ? '更偏好直接建议'
-              : profile.preference_signals.openToPublicInteraction
-                ? '愿意公开互动'
-                : '画像偏好待观察';
-        this.emotionTrendLabel = profile.preferred_day ? `更常在${profile.preferred_day}记录` : this.emotionTrendLabel;
-        this.care = profile.preference_signals.prefersVoice
-          ? '你更适合语音表达，先说出来会更轻松。'
-          : profile.preference_signals.prefersPrivateWriting
-            ? '你更适合先写下来，再慢慢整理。'
-            : profile.preference_signals.prefersDirectAdvice
-              ? '你最近更需要直接一点的建议。'
-              : this.care;
-        this.recommendations = this.recommendations.map((item: Recommendation, index: number) => {
-          if (index === 0 && profile.preference_signals.prefersVoice) {
-            item.title = '先用语音说出来';
-            item.description = '从最自然的表达方式开始';
-          }
-          if (index === 0 && profile.preference_signals.prefersPrivateWriting) {
-            item.title = '先写进树洞';
-            item.description = '让情绪先有一个安全出口';
-          }
-          return item;
-        });
+        this.profileSignalsText = profile.preference_signals.prefersVoice ? '更偏好语音表达' :
+          profile.preference_signals.prefersPrivateWriting ? '更偏好私密写作' :
+            profile.preference_signals.prefersDirectAdvice ? '更偏好直接建议' :
+              profile.preference_signals.openToPublicInteraction ? '愿意公开互动' : '画像偏好待观察';
+        this.care = profile.preference_signals.prefersVoice ? '你更适合语音表达，先说出来会更轻松。' :
+          profile.preference_signals.prefersPrivateWriting ? '你更适合先写下来，再慢慢整理。' :
+            profile.preference_signals.prefersDirectAdvice ? '你最近更需要直接一点的建议。' : this.care;
       } catch (profileErr) {
         console.error('load profile overview failed', profileErr);
       }
@@ -152,7 +147,13 @@ struct Index {
         console.error('anonymous fallback failed', guestErr);
       }
     } finally {
-      this.isLoading = false;
+      try {
+        animateTo({ duration: 520, curve: Curve.Friction }, () => {
+          this.isLoading = false;
+        });
+      } catch (err) {
+        this.isLoading = false;
+      }
     }
   }
 
@@ -161,9 +162,16 @@ struct Index {
       return true;
     }
     let toastOptions: ToastOptions = { message: `${actionName}需要先登录或选择匿名体验` };
-    let loginOptions: PushUrlOptions = { url: 'pages/LoginPage' };
-    promptAction.showToast(toastOptions);
-    router.pushUrl(loginOptions);
+    try {
+      promptAction.showToast(toastOptions);
+    } catch (err) {
+      console.error('showToast failed', err);
+    }
+    try {
+      router.pushUrl({ url: 'pages/LoginPage' });
+    } catch (err) {
+      console.error('pushUrl failed', err);
+    }
     return false;
   }
 
@@ -171,11 +179,22 @@ struct Index {
     if (featureName && !this.requireAuth(featureName)) {
       return;
     }
-    let pushOptions: PushUrlOptions = { url: url };
-    router.pushUrl(pushOptions);
+    try {
+      router.pushUrl({ url: url } as PushUrlOptions);
+    } catch (err) {
+      console.error('pushUrl failed', err);
+    }
   }
 
   private refreshCurrentState(): void {
+    try {
+      animateTo({ duration: 380, curve: Curve.EaseOut }, () => {
+        this.cardLift = !this.cardLift;
+        this.glowPhase = this.glowPhase === 0 ? 1 : 0;
+      });
+    } catch (err) {
+      console.error('animateTo failed', err);
+    }
     this.isLoading = true;
     this.load();
   }
@@ -190,724 +209,556 @@ struct Index {
       this.currentUser = null;
       this.isAnonymous = false;
       this.isGuest = true;
-      let logoutToast: ToastOptions = { message: '已退出登录' };
-      let replaceOptions: PushUrlOptions = { url: 'pages/LoginPage' };
-      promptAction.showToast(logoutToast);
-      router.replaceUrl(replaceOptions);
+      try {
+        promptAction.showToast({ message: '已退出登录' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
+      try {
+        router.replaceUrl({ url: 'pages/LoginPage' });
+      } catch (err) {
+        console.error('replaceUrl failed', err);
+      }
     }
   }
 
   build() {
     Stack() {
+      this.FluidBackground()
       if (this.isLoading) {
-        Column() {
-          LoadingProgress().width(48).height(48).color('#7658F6')
-          Text('加载中...').fontSize(14).fontColor('#8B849B').margin({ top: 12 })
-        }
-        .width('100%').height('100%').justifyContent(FlexAlign.Center).backgroundColor('#F7F4FF')
+        this.LoadingView()
       } else {
         Tabs({ barPosition: BarPosition.End }) {
-          TabContent() {
-            this.Home()
-          }.tabBar(this.Tab('首页', $r('app.media.home'), 0))
-
-          TabContent() {
-            this.Page('树洞', '这里是只属于你的私密空间', '进入树洞', 'pages/TreeHole', '树洞')
-          }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
-
-          TabContent() {
-            this.Page('倾诉', '选择一种舒服的方式,把此刻说出来', '开始 AI 陪伴', 'pages/Chat', '倾诉')
-          }.tabBar(this.MidTab())
-
-          TabContent() {
-            this.Page('广场', '匿名表达与温和共鸣', '进入广场', 'pages/Plaza', '广场')
-          }.tabBar(this.Tab('广场', $r('app.media.community'), 3))
-
-          TabContent() {
-            this.Page('发现', '情绪报告、成长记录和个性化推荐', '查看报告', 'pages/EmotionReport', '发现')
-          }.tabBar(this.Tab('发现', $r('app.media.community'), 4))
-
-          TabContent() {
-            this.Me()
-          }.tabBar(this.Tab('我的', $r('app.media.profile'), 5))
-        }.barHeight(68).barBackgroundColor('#FFFFFF').backgroundColor('#F7F4FF').onChange((i: number) => {
-          this.tab = i;
+          TabContent() { this.Home() }.tabBar(this.Tab('首页', $r('app.media.home'), 0))
+          TabContent() { this.FeaturePage('树洞', '登录树洞，发现更多美好', '进入树洞', 'pages/TreeHole', '树洞') }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
+          TabContent() { this.FeaturePage('倾诉', '今天想说点什么吗？', '开始今日倾诉', 'pages/Chat', '倾诉') }.tabBar(this.CenterTab())
+          TabContent() { this.FeaturePage('广场', '匿名共鸣，连接真实的你', '进入广场', 'pages/Plaza', '广场') }.tabBar(this.Tab('广场', $r('app.media.community'), 3))
+          TabContent() { this.ProfilePage() }.tabBar(this.Tab('我的', $r('app.media.profile'), 4))
+        }
+        .barHeight(82)
+        .barBackgroundColor('#FFFFFFD9')
+        .backgroundColor(Color.Transparent)
+        .onChange((i: number) => {
+          try {
+            animateTo({ duration: 320, curve: Curve.EaseOut }, () => {
+              this.tab = i;
+            });
+          } catch (err) {
+            console.error('animateTo failed', err);
+          }
         })
       }
     }
-    .width('100%').height('100%')
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#F7F3FF')
   }
 
   @Builder
-  Tab(t: string, icon: Resource, n: number) {
-    Column() {
-      Image(icon).width(24).height(24)
-        .fillColor(this.tab === n ? '#7658F6' : '#8B8A99').margin({ bottom: 4 })
-      Text(t).fontSize(10).fontColor(this.tab === n ? '#7658F6' : '#8B8A99')
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+  FluidBackground() {
+    Stack() {
+      Rect().width('100%').height('100%').fill('#FAF8FF')
+      Circle().width(this.glowPhase === 0 ? 330 : 390).height(this.glowPhase === 0 ? 330 : 390).fill('#DDD1FF').opacity(0.92).blur(42).position({ x: -118, y: -74 })
+      Circle().width(this.glowPhase === 0 ? 250 : 310).height(this.glowPhase === 0 ? 250 : 310).fill('#BDA7FF').opacity(0.42).blur(54).position({ x: '58%', y: 34 })
+      Circle().width(this.glowPhase === 0 ? 210 : 260).height(this.glowPhase === 0 ? 210 : 260).fill('#F8CBE8').opacity(0.42).blur(60).position({ x: '66%', y: '50%' })
+      Circle().width(260).height(260).fill('#EAF9F0').opacity(0.68).blur(70).position({ x: -72, y: '62%' })
+      this.SoftLeaf(22, 148, 46, '#D8C4FF')
+      this.SoftLeaf(326, 92, 58, '#C0A8FF')
+      this.SoftLeaf(380, 166, 42, '#D9C7FF')
+      Row() {
+        Circle().width(4).height(4).fill('#FFFFFF')
+        Circle().width(4).height(4).fill('#FFFFFF').margin({ left: 8 })
+        Circle().width(4).height(4).fill('#FFFFFF').margin({ left: 8 })
+        Circle().width(4).height(4).fill('#FFFFFF').margin({ left: 8 })
+      }.position({ x: 42, y: 222 }).opacity(0.8)
+      Rect().width('100%').height(96).fill('#F3E8FF66').borderRadius({ topLeft: 60, topRight: 120 }).position({ x: 0, y: '88%' }).blur(3)
+    }.width('100%').height('100%')
   }
 
   @Builder
-  MidTab() {
+  SoftLeaf(x: number, y: number, size: number, color: string) {
+    Ellipse().width(size).height(size * 1.75).fill(color).opacity(0.56).rotate({ angle: -28 }).blur(1).position({ x: x, y: y })
+  }
+
+  @Builder
+  LoadingView() {
     Column() {
-      Column() {
-        Image($r('app.media.voice')).width(28).height(28).fillColor('#FFF')
+      Stack() {
+        Circle().width(78).height(78).fill('#FFFFFFA8').backdropBlur(24)
+        Circle().width(this.glowPhase === 0 ? 38 : 52).height(this.glowPhase === 0 ? 38 : 52).fill('#7C55FF').opacity(0.72).blur(4)
       }
-      .width(56)
-      .height(56)
-      .borderRadius(28)
-      .backgroundColor('#7B57FF')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .shadow({ radius: 18, color: '#7B57FF55', offsetY: 6 })
-
-      Text('倾诉').fontSize(10).fontColor('#7658F6').fontWeight(FontWeight.Bold)
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      Text('正在同步树洞情绪').fontSize(14).fontColor('#7D7392').margin({ top: 16 })
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
   @Builder
   Home() {
     Scroll() {
       Column() {
-        this.Head()
-        this.Hero()
-        this.Status()
-        this.Recommend()
-        this.QuickLoop()
-        this.EntryGrid()
-        this.Device()
-        Text('陪伴而不诊断，引导而不治疗').fontSize(11).fontColor('#B9B5C8').margin({ top: 16, bottom: 18 })
+        this.StatusBarMock()
+        this.HomeHeader()
+        this.MascotHero()
+        this.ChatEntrance()
+        this.FeatureEntryGrid()
+        this.StatusCareGrid()
+        this.RecommendCards()
+        Text('陪伴而不诊断 · 引导而不治疗').fontSize(11).fontColor('#A29AAF').letterSpacing(1).margin({ top: 18, bottom: 110 })
       }
       .width('100%')
       .constraintSize({ maxWidth: 760 })
-      .padding({ left: 12, right: 12, top: 8 })
-      .margin({ bottom: 18 })
+      .padding({ left: 22, right: 22, top: 10 })
       .alignItems(HorizontalAlign.Center)
-    }.width('100%').height('100%').backgroundColor('#F4F1FF')
+    }.width('100%').height('100%').backgroundColor(Color.Transparent)
   }
 
   @Builder
-  Head() {
-    Column() {
-      Row() {
-        Text('09:30').fontSize(12).fontColor('#6D6880')
-        Blank()
-        Row() {
-          Text('!').fontSize(12).fontColor('#C53A4A').fontWeight(FontWeight.Bold)
-          Text(' 多设备已连接').fontSize(11).fontColor('#C53A4A').fontWeight(FontWeight.Medium)
-          Text(' 管理设备').fontSize(11).fontColor('#7B57FF').fontWeight(FontWeight.Medium)
-        }
-        .padding({
-          left: 10,
-          right: 10,
-          top: 5,
-          bottom: 5
-        })
-        .backgroundColor('#FFF0F2')
-        .borderRadius(14)
-        .onClick(() => this.openFeature('pages/ProfileTimeline', '设备管理'))
-      }.width('100%').height(22)
-
-      Row() {
-        Text(`情绪：${this.emotion}`).fontSize(11).fontColor('#6E6781')
-        Text(` · ${this.emotionSummary}`).fontSize(11).fontColor('#6E6781')
-        Blank()
-        Text(`风险 ${this.riskLevel}`)
-          .fontSize(11)
-          .fontColor(this.riskLevel === 'high' || this.riskLevel === 'critical' ? '#D9534F' : '#6E6781')
-      }.width('100%').margin({ top: 6 })
-
-      Text(this.profileOverviewText)
-        .fontSize(11)
-        .fontColor(this.profileOverviewReady ? '#7B57FF' : '#8B849B')
-        .margin({ top: 6 })
-      if (this.profileSignalsText) {
-        Text(this.profileSignalsText)
-          .fontSize(11)
-          .fontColor('#8B849B')
-          .margin({ top: 4 })
-      }
-      Row() {
-        Image($r('app.media.avatar1')).width(42).height(42).borderRadius(21)
-        Column() {
-          Text(this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '用户'))
-            .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#19162B')
-          Text(this.isGuest ? '未登录' : (this.isAnonymous ? '匿名模式' : '正式账号'))
-            .fontSize(8)
-            .fontColor('#FFF')
-            .padding({ left: 6, right: 6 })
-            .backgroundColor(this.isGuest ? '#B9B5C8' : (this.isAnonymous ? '#9B8FEA' : '#7D8DFF'))
-            .borderRadius(7)
-        }.alignItems(HorizontalAlign.Start).margin({ left: 10 })
-
-        Blank()
-        Text('首页')
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#171329')
-          .padding({ bottom: 6 })
-          .border({ width: { bottom: 3 }, color: '#7762F4' })
-        Blank()
-      }.width('100%').height(62).alignItems(VerticalAlign.Center)
-    }.width('100%')
+  StatusBarMock() {
+    Row() {
+      Text('10:34').fontSize(15).fontWeight(FontWeight.Medium).fontColor('#141326')
+      Blank()
+      Text('◐  ⌁⌁  Wi‑Fi  100').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#141326')
+    }.width('100%').height(28)
   }
 
   @Builder
-  Hero() {
-    Stack() {
-      Row() {
-        Column() {
-          Text(this.isGuest ? '👋 欢迎来到树洞' : (this.isAnonymous ? '👋 欢迎来到树洞' : '👋 欢迎回来'))
-            .fontSize(24).fontWeight(FontWeight.Bold).fontColor('#17112D').maxLines(1)
-          Text(this.isGuest ? '请先登录、注册或选择匿名体验' :
-            (this.isAnonymous ? '在这里你可以放心倾诉' : '很高兴再次见到你'))
-            .fontSize(14).fontColor('#77708B').margin({ top: 8 })
-          if (this.isAnonymous) {
-            Text(this.guestLimitText).fontSize(12).fontColor('#8E89A6').margin({ top: 6 })
-          }
-          Row() {
-            this.Pill('无压力倾诉')
-            this.Pill('AI共情陪伴')
-            this.Pill('隐私安全守护')
-          }.margin({ top: 14 })
-
-          Row() {
-            Image($r('app.media.comment')).width(20).height(20).fillColor('#FFF').margin({ right: 8 })
-            Column() {
-              Text('想说点什么吗？').fontSize(15).fontColor('#FFF').fontWeight(FontWeight.Medium)
-              Text(this.isGuest ? '请先登录或选择匿名体验' : this.currentStatusHint).fontSize(12).fontColor('#E7DEFF')
-            }.alignItems(HorizontalAlign.Start)
-
-            Blank()
-            Image($r('app.media.arrow_right')).width(20).height(20).fillColor('#FFF')
-          }
-          .height(58)
-          .width('90%')
-          .padding({ left: 16, right: 14 })
-          .backgroundColor(this.isGuest ? '#AFA7D8' : (this.isAnonymous ? '#9B8FEA' : '#8061F8'))
-          .borderRadius(16)
-          .margin({ top: 18 })
-          .onClick(() => this.openFeature('pages/Chat', '倾诉'))
-
-          Button(this.isGuest ? '去登录或匿名体验' : (this.isAnonymous ? '登录解锁完整功能' : '开始今日倾诉'))
-            .width('90%')
-            .height(42)
-            .fontSize(14)
-            .fontColor(this.isGuest ? '#7658F6' : (this.isAnonymous ? '#7658F6' : '#FFF'))
-            .backgroundColor(this.isGuest ? '#F2ECFF' : (this.isAnonymous ? '#F2ECFF' : '#7658F6'))
-            .borderRadius(14)
-            .margin({ top: 10 })
-            .onClick(() => {
-              if (this.isGuest) {
-                router.pushUrl({ url: 'pages/LoginPage' });
-              } else {
-                this.openFeature('pages/Chat', '倾诉');
-              }
-            })
-        }.width('60%').padding({ left: 24, top: 26 }).alignItems(HorizontalAlign.Start)
-
-        Blank()
-        this.Tree()
-      }.height('100%')
-
-      if (this.isGuest) {
-        Text('👤 未登录')
-          .fontSize(11)
-          .fontColor('#FFF')
-          .textAlign(TextAlign.Center)
-          .padding(10)
-          .backgroundColor('#8E89A6AA')
-          .borderRadius(18)
-          .position({ x: '76%', y: 52 })
-      } else if (this.isAnonymous) {
-        Text('🛡 游客模式')
-          .fontSize(11)
-          .fontColor('#FFF')
-          .textAlign(TextAlign.Center)
-          .padding(10)
-          .backgroundColor('#5A436688')
-          .borderRadius(18)
-          .position({ x: '76%', y: 52 })
-      } else {
-        Text('🛡 已登录账号')
-          .fontSize(11)
-          .fontColor('#FFF')
-          .textAlign(TextAlign.Center)
-          .padding(10)
-          .backgroundColor('#5A436688')
-          .borderRadius(18)
-          .position({ x: '76%', y: 52 })
-      }
-    }
-    .height(272)
-    .width('100%')
-    .backgroundColor('#ECE7FF')
-    .borderRadius(18)
-    .clip(true)
-    .shadow({ radius: 14, color: '#9B8FEA22', offsetY: 6 })
-  }
-
-  @Builder
-  Pill(t: string) {
-    Text(t)
-      .fontSize(10)
-      .fontColor('#837A9A')
-      .padding({
-        left: 10,
-        right: 10,
-        top: 6,
-        bottom: 6
-      })
-      .backgroundColor('#F5F1FF')
-      .borderRadius(12)
-      .margin({ right: 7 })
-  }
-
-  @Builder
-  Tree() {
-    Image($r('app.media.tree'))
-      .width('40%')
-      .height('100%')
-      .objectFit(ImageFit.Cover)
-  }
-
-  @Builder
-  Status() {
-    GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
-      GridCol({ span: { xs: 12, sm: 6 } }) {
-        this.StateCard()
-      }
-
-      GridCol({ span: { xs: 12, sm: 6 } }) {
-        this.Care()
-      }
-    }.width('100%').margin({ top: 16 })
-  }
-
-  @Builder
-  StateCard() {
-    Column() {
-      Row() {
-        Text('✺ 当前状态').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#2D2840')
-        Text(` · ${this.emotionTrendLabel}`).fontSize(12).fontColor('#9B96AC')
-        Blank()
-      }.width('100%')
-
-      Row() {
-        this.Metric('☺', '情绪', this.emotion, `${Math.round(this.emotionIntensity * 100)}分`, '#FFE6A7')
-        this.Line()
-        Column() {
-          this.Metric('⌂', '场景', this.isAnonymous ? '匿名体验' : '真实账号', this.isGuest ? '未登录' : '在线',
-            '#DED9FF')
-        }.width('100%')
-
-        this.Line()
-        Column() {
-          this.Focus()
-        }.width('100%')
-
-        this.Line()
-        this.Metric('▯', '能量值', this.riskLevel === 'high' || this.riskLevel === 'critical' ? '需要关注' : '稳定',
-          this.riskLevel, '#DDF7E3')
-      }.height(116).width('100%')
-    }
-    .padding(20)
-    .width('100%')
-    .backgroundColor('#FFF')
-    .borderRadius(18)
-    .shadow({ radius: 12, color: '#8B7ED622', offsetY: 4 })
-  }
-
-  @Builder
-  Metric(i: string, l: string, t: string, s: string, c: string) {
-    Column() {
-      Text(i)
-        .fontSize(26)
-        .fontColor('#6C5CE7')
-        .width(42)
-        .height(42)
-        .textAlign(TextAlign.Center)
-        .backgroundColor(c)
-        .borderRadius(21)
-      Text(l).fontSize(12).fontColor('#918AA3')
-      Text(t).fontSize(15).fontWeight(FontWeight.Medium).fontColor('#19162B')
-      Text(s).fontSize(12).fontColor('#7C768D')
-    }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-  }
-
-  @Builder
-  Focus() {
-    Column() {
-      Text('专注度').fontSize(12).fontColor('#918AA3')
-      Stack() {
-        Progress({ value: 68, total: 100, type: ProgressType.Ring }).width(54).height(54)
-          .color('#7FD9AE').backgroundColor('#EEEAF8')
-        Text('68%').fontSize(12).fontColor('#776F88')
-      }.margin({ top: 7 })
-    }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-  }
-
-  @Builder
-  Line() {
-    Divider().vertical(true).height(72).color('#EEEAF8').strokeWidth(1)
-  }
-
-  @Builder
-  Care() {
-    Stack({ alignContent: Alignment.BottomEnd }) {
+  HomeHeader() {
+    Row() {
+      Column() {
+        Text('早上好  👋').fontSize(14).fontColor('#4D4960')
+        Text('欢迎回来').fontSize(30).fontWeight(FontWeight.Bold).fontColor('#19172C').margin({ top: 10 })
+        Text(this.isGuest ? '登录树洞，发现更多美好' : '很高兴再次见到你')
+          .fontSize(14).fontColor('#7F788E').margin({ top: 10 })
+      }.alignItems(HorizontalAlign.Start)
+      Blank()
       Column() {
         Row() {
-          Text('✈ 主动关怀').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#30294B')
-          Text('关怀中')
-            .fontSize(10)
-            .fontColor('#7B57FF')
-            .padding({
-              left: 7,
-              right: 7,
-              top: 3,
-              bottom: 3
-            })
-            .backgroundColor('#EEE8FF')
-            .borderRadius(10)
-            .margin({ left: 6 })
-          Blank()
+          Text('▣').fontSize(14).fontColor('#332F45')
+          Text(' 多设备已连接  ›').fontSize(13).fontColor('#332F45')
         }
-
-        Text(this.care)
-          .fontSize(12)
-          .fontColor('#60596F')
-          .lineHeight(18)
-          .width('100%')
-          .maxLines(3)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 10 })
-        if (this.profileStateVector) {
-          Row() {
-            this.VectorChip('V', this.profileStateVector.valence)
-            this.VectorChip('A', this.profileStateVector.arousal)
-            this.VectorChip('D', this.profileStateVector.dominance)
-            this.VectorChip('S', this.profileStateVector.social)
-            this.VectorChip('C', this.profileStateVector.cognitive)
-          }.margin({ top: 10 })
-        }
+        .padding({ left: 10, right: 10, top: 7, bottom: 7 })
+        .backgroundColor('#FFFFFF8C')
+        .borderRadius(16)
+        .backdropBlur(18)
+        .onClick(() => this.openFeature('pages/ProfileTimeline', '设备管理'))
         Row() {
-          Button('聊一聊')
-            .width(84)
-            .height(28)
-            .fontSize(11)
-            .fontColor('#FFF')
-            .backgroundColor('#7658F6')
-            .borderRadius(14)
-            .onClick(() => this.openFeature('pages/Chat', '倾诉'))
-          Button('写树洞')
-            .width(84)
-            .height(28)
-            .fontSize(11)
-            .fontColor('#7658F6')
-            .backgroundColor('#FFF')
-            .borderRadius(14)
-            .margin({ left: 8 })
-            .onClick(() => this.openFeature('pages/TreeHole', '树洞'))
-        }.margin({ top: 10 })
-      }.padding(20).width('100%').height('100%').alignItems(HorizontalAlign.Start)
-
-      Image($r('app.media.avatar1'))
-        .width(96)
-        .height(96)
-        .margin({ right: 2, bottom: 4 })
-    }
-    .height(168)
-    .width('100%')
-    .backgroundColor('#F0E9FF')
-    .borderRadius(18)
-    .clip(true)
-  }
-
-  @Builder
-  VectorChip(label: string, value: number) {
-    Column() {
-      Text(label).fontSize(9).fontColor('#9B96AC')
-      Text(`${Math.round(value * 100)}`).fontSize(11).fontWeight(FontWeight.Bold).fontColor('#5B4C9B')
-    }
-    .padding({
-      left: 8,
-      right: 8,
-      top: 6,
-      bottom: 6
-    })
-    .backgroundColor('#FFF')
-    .borderRadius(10)
-    .margin({ right: 6 })
-  }
-
-  @Builder
-  Recommend() {
-    Column() {
-      Row() {
-        Text('为你推荐').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#201B34')
-        Blank()
-        Row() {
-          Image($r('app.media.refresh')).width(18).height(18).fillColor('#7658F6')
-        }.padding(8).backgroundColor('#F3ECFF').borderRadius(999)
-        .onClick(() => {
-          this.refreshCurrentState();
-        })
-      }.margin({ top: 24, bottom: 14 }).width('100%')
-
-      Row() {
-        this.Tag('治愈时刻', 0)
-        this.Tag('学习提升', 1)
-        this.Tag('轻松娱乐', 2)
-        this.Tag('成长记录', 3)
-      }.justifyContent(FlexAlign.Center).margin({ bottom: 14 }).width('100%')
-
-      GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
-        if (this.recommendations.length > 0) {
-          ForEach(this.recommendations.slice(0, 4), (item: Recommendation, index: number) => {
-            GridCol({ span: { xs: 6, sm: 3 } }) {
-              this.Rec(item.title, item.description || '温和陪伴和下一步建议', `${item.priority}`, this.recColor(index))
-            }
-          }, (item: Recommendation) => item.title)
-        } else {
-          GridCol({ span: { xs: 6, sm: 3 } }) {
-            this.Rec('写进树洞', '把心情先放下来', '建议', '#7FA36B')
-          }
-
-          GridCol({ span: { xs: 6, sm: 3 } }) {
-            this.Rec('做一次呼吸', '先让自己慢一点', '建议', '#C8B28C')
-          }
-
-          GridCol({ span: { xs: 6, sm: 3 } }) {
-            this.Rec('去广场看看', '找一点共鸣', '建议', '#C9A391')
-          }
-
-          GridCol({ span: { xs: 6, sm: 3 } }) {
-            this.Rec('看情绪报告', '回顾最近状态', '建议', '#6D74B8')
-          }
-        }
-      }.width('100%')
-
-      Row() {
-        this.QuickAction('呼吸练习', 'pages/Chat', '倾诉')
-        this.QuickAction('写入树洞', 'pages/TreeHole', '树洞')
-        this.QuickAction('去广场', 'pages/Plaza', '广场')
-        this.QuickAction('看推荐', 'pages/RecommendationPage', '发现')
-      }.margin({ top: 10 }).width('100%')
-
-      Row() {
-        Button('刷新首页状态')
-          .height(30)
-          .fontSize(11)
-          .backgroundColor('#F3ECFF')
-          .fontColor('#7658F6')
-          .borderRadius(15)
-          .onClick(() => this.refreshCurrentState())
-        Button('去推荐页')
-          .height(30)
-          .fontSize(11)
-          .backgroundColor('#F6F2FF')
-          .fontColor('#7658F6')
-          .borderRadius(15)
-          .margin({ left: 8 })
-          .onClick(() => router.pushUrl({ url: 'pages/RecommendationPage' }))
-        Button('画像趋势')
-          .height(30)
-          .fontSize(11)
-          .backgroundColor('#EEF8FF')
-          .fontColor('#3A7BBF')
-          .borderRadius(15)
-          .margin({ left: 8 })
-          .onClick(() => router.pushUrl({ url: 'pages/ProfileTimeline' }))
-        Button('搭子匹配')
-          .height(30)
-          .fontSize(11)
-          .backgroundColor('#F0F7ED')
-          .fontColor('#5A8A4E')
-          .borderRadius(15)
-          .margin({ left: 8 })
-          .onClick(() => router.pushUrl({ url: 'pages/MatchPage' }))
-      }.margin({ top: 12 }).width('100%')
-    }.width('100%')
-  }
-
-  @Builder
-  QuickAction(title: string, url: string, featureName: string) {
-    Column() {
-      Text(title).fontSize(12).fontColor('#5A526A').fontWeight(FontWeight.Medium)
-      Button('打开')
-        .fontSize(10)
-        .height(28)
-        .margin({ top: 8 })
-        .backgroundColor('#FFFFFF')
-        .fontColor('#7658F6')
-        .borderRadius(14)
-        .onClick(() => this.openFeature(url, featureName))
-    }
-    .layoutWeight(1)
-    .padding(14)
-    .backgroundColor('#FFF')
-    .borderRadius(14)
-    .margin({ right: 8 })
-  }
-
-  @Builder
-  EntryGrid() {
-    GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
-      GridCol({ span: { xs: 6, sm: 3 } }) {
-        this.EntryCard('AI 聊天', '倾诉和陪伴', '#8B6FF7', 'pages/Chat', '倾诉')
-      }
-
-      GridCol({ span: { xs: 6, sm: 3 } }) {
-        this.EntryCard('私密树洞', '只给自己看', '#6DAA90', 'pages/TreeHole', '树洞')
-      }
-
-      GridCol({ span: { xs: 6, sm: 3 } }) {
-        this.EntryCard('匿名广场', '匿名表达', '#E18B71', 'pages/Plaza', '广场')
-      }
-
-      GridCol({ span: { xs: 6, sm: 3 } }) {
-        this.EntryCard('情绪报告', '查看趋势', '#5F7DDB', 'pages/EmotionReport', '发现')
-      }
-
-      GridCol({ span: { xs: 6, sm: 3 } }) {
-        this.EntryCard('推荐页', '个性化建议', '#7B57FF', 'pages/RecommendationPage', '发现')
-      }
+          Text('🛡').fontSize(14)
+          Text(this.isGuest ? ' 未登录' : ' 已登录账号').fontSize(12).fontColor('#5A526A')
+        }.margin({ top: 20 })
+      }.alignItems(HorizontalAlign.End)
     }.width('100%').margin({ top: 12 })
   }
 
   @Builder
-  Tag(t: string, i: number) {
-    Text(t)
-      .fontSize(11)
-      .fontColor(this.tag === i ? '#FFF' : '#8F89A0')
-      .padding({
-        left: 12,
-        right: 12,
-        top: 6,
-        bottom: 6
-      })
-      .backgroundColor(this.tag === i ? '#7658F6' : '#F7F4FF')
-      .borderRadius(13)
-      .margin({ right: 8 })
-      .onClick(() => {
-        this.tag = i;
-      })
+  MascotHero() {
+    Stack() {
+      Circle().width(94).height(94).fill('#BCA4FF').opacity(this.glowPhase === 0 ? 0.72 : 0.92).blur(1).position({ x: '61%', y: 18 })
+      Ellipse().width(114).height(36).fill('#A48CFF').opacity(0.45).rotate({ angle: -16 }).position({ x: '55%', y: 54 })
+      Circle().width(70).height(70).fill('#F9F6FF').shadow({ radius: 18, color: '#9D84FF44', offsetY: 8 }).position({ x: '66%', y: 88 })
+      Text('⌣').fontSize(26).fontColor('#332D52').position({ x: '72%', y: 112 })
+      this.Sparkle(36, 70)
+      this.Sparkle(306, 28)
+    }.width('100%').height(170).margin({ top: -8 })
   }
 
   @Builder
-  Rec(t: string, d: string, time: string, c: string) {
-    Column() {
-      Stack() {
-        Rect().width('100%').height(92).fill(c).opacity(0.22)
-        Circle().width(90).height(90).fill(c).opacity(0.4)
-        Text(time)
-          .fontSize(9)
-          .fontColor('#FFF')
-          .backgroundColor('#00000055')
-          .borderRadius(5)
-          .padding({ left: 5, right: 5 })
-          .position({ x: '66%', y: 72 })
-      }.height(92).width('100%')
+  Sparkle(x: number, y: number) {
+    Text('✦').fontSize(this.glowPhase === 0 ? 12 : 18).fontColor('#FFFFFF').opacity(0.88).position({ x: x, y: y })
+  }
 
+  @Builder
+  ChatEntrance() {
+    Stack() {
+      Circle().width(132).height(132).fill('#ECE5FF').opacity(0.78).position({ x: '73%', y: 24 })
+      Circle().width(112).height(84).fill('#DFD5FF').opacity(0.76).position({ x: '70%', y: 64 })
+      Circle().width(12).height(12).fill('#8A6CFF').position({ x: '76%', y: 74 })
+      Circle().width(12).height(12).fill('#A48EFF').position({ x: '83%', y: 74 })
+      Circle().width(12).height(12).fill('#C0B0FF').position({ x: '90%', y: 74 })
       Column() {
-        Text(t).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#272137').maxLines(1)
-        Text(d).fontSize(11).fontColor('#8C8597').maxLines(1).margin({ top: 4 })
-        Text('建议').fontSize(10).fontColor(c).margin({ top: 8 })
-      }.padding(10).alignItems(HorizontalAlign.Start)
+        Text('今天想说点什么吗？').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#201D35')
+        Text('倾诉一下，让心情更轻松').fontSize(14).fontColor('#8A8398').margin({ top: 8 })
+        Button('开始今日倾诉   ›')
+          .height(44)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+          .backgroundColor('#7655F6')
+          .borderRadius(16)
+          .margin({ top: 20 })
+          .shadow({ radius: this.cardLift ? 24 : 14, color: '#7655F666', offsetY: this.cardLift ? 10 : 6 })
+          .sharedTransition('chat-entrance')
+          .onClick(() => this.openFeature('pages/Chat', '倾诉'))
+      }
+      .width('62%')
+      .alignItems(HorizontalAlign.Start)
+      .position({ x: 24, y: 28 })
     }
-    .height(174)
     .width('100%')
-    .backgroundColor('#FFF')
-    .borderRadius(12)
+    .height(156)
+    .margin({ top: 2 })
+    .backgroundColor('#FFFFFFCC')
+    .border({ width: 1, color: '#FFFFFF' })
+    .borderRadius(24)
+    .backdropBlur(28)
     .clip(true)
+    .scale({ x: this.isHeroPressed ? 0.985 : 1, y: this.isHeroPressed ? 0.985 : 1 })
+    .shadow({ radius: 28, color: '#8B7AFF1F', offsetY: 12 })
+    .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+      try {
+        animateTo({ duration: 160, curve: Curve.EaseOut }, () => { this.isHeroPressed = true; });
+        animateTo({ duration: 260, curve: Curve.EaseOut }, () => { this.isHeroPressed = false; });
+      } catch (err) {
+        console.error('animateTo failed', err);
+      }
+    }))
   }
 
   @Builder
-  Device() {
-    Column() {
-      Row() {
-        Text('最近动态').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#201B34')
-        Blank()
-        Text('闭环入口').fontSize(11).fontColor('#7B57FF')
-      }.width('100%').margin({ bottom: 10 })
-
-      ForEach(this.recentActions, (item: GeneratedTypeLiteralInterface_2) => {
-        Row() {
-          Column() {
-            Text(item.title).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#272137')
-            Text(item.desc).fontSize(11).fontColor('#8C8597').margin({ top: 4 })
-          }.alignItems(HorizontalAlign.Start)
-
-          Blank()
-          Button('去')
-            .fontSize(11)
-            .height(28)
-            .backgroundColor('#F3ECFF')
-            .fontColor('#7658F6')
-            .borderRadius(14)
-            .onClick(() => this.openFeature(item.url, item.title))
+  FeatureEntryGrid() {
+    GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
+      ForEach(this.featureEntries, (item: FeatureEntry) => {
+        GridCol({ span: { xs: 4, sm: 4, md: 4, lg: 4 } }) {
+          this.MiniFeatureCard(item)
         }
-        .width('100%')
-        .padding(14)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(14)
-        .margin({ bottom: 8 })
-      })
+      }, (item: FeatureEntry) => item.title)
     }.width('100%').margin({ top: 16 })
   }
 
   @Builder
-  QuickLoop() {
+  MiniFeatureCard(item: FeatureEntry) {
+    Column() {
+      Stack() {
+        Circle().width(42).height(42).fill(item.tint).opacity(0.14)
+        Text(item.icon).fontSize(23).fontColor(item.tint)
+      }.width(48).height(48)
+      Text(item.title).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#27243A').maxLines(1).margin({ top: 8 })
+      Text(item.desc).fontSize(11).fontColor('#918A9F').margin({ top: 4 })
+    }
+    .height(112)
+    .width('100%')
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor('#FFFFFFD9')
+    .border({ width: 1, color: '#FFFFFF' })
+    .borderRadius(18)
+    .backdropBlur(22)
+    .shadow({ radius: 18, color: `${item.tint}20`, offsetY: 8 })
+    .onClick(() => this.openFeature(item.url, item.featureName))
+  }
+
+  @Builder
+  StatusCareGrid() {
+    GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
+      GridCol({ span: { xs: 6, sm: 6, md: 6, lg: 6 } }) { this.CurrentStatusCard() }
+      GridCol({ span: { xs: 6, sm: 6, md: 6, lg: 6 } }) { this.DailyCareCard() }
+    }.width('100%').margin({ top: 16 })
+  }
+
+  @Builder
+  CurrentStatusCard() {
     Column() {
       Row() {
-        Text('快速闭环').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#201B34')
-        Blank()
-        Text('一键回到行动').fontSize(11).fontColor('#8B849B')
-      }.width('100%').margin({ bottom: 10 })
-
-      Row() {
-        this.QuickAction('树洞记录', 'pages/TreeHole', '树洞')
-        this.QuickAction('查看搭子', 'pages/MatchPage', '广场')
-        this.QuickAction('安全帮助', 'pages/SafetyHelp', '广场')
+        Text('当前状态').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#232037')
+        Text(' 更新于 09:30').fontSize(10).fontColor('#A7A0B3').margin({ left: 8 })
       }.width('100%')
+      Row() {
+        Column() {
+          Text('☺').fontSize(45).textAlign(TextAlign.Center).width(68).height(68).backgroundColor('#FFF6D7').borderRadius(34)
+          Text('情绪').fontSize(11).fontColor('#A7A0B3').margin({ top: 8 })
+          Text(`${this.emotion}  ${Math.round(this.emotionIntensity * 100)}分`).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#28243A').margin({ top: 3 })
+        }.width('48%')
+        Divider().vertical(true).height(112).color('#EEEAF4')
+        Column() {
+          this.StatusLine('⌂', '场景', this.isAnonymous ? '匿名' : '居家')
+          this.StatusLine('▯', '能量值', this.riskLevel === 'low' ? '82%' : this.riskLevel)
+        }.layoutWeight(1).padding({ left: 12 }).alignItems(HorizontalAlign.Start)
+      }.width('100%').margin({ top: 14 })
+      Row() {
+        Text('专注度').fontSize(12).fontColor('#8F879A')
+        Progress({ value: 68, total: 100, type: ProgressType.Linear }).layoutWeight(1).height(6).color('#8061F8').backgroundColor('#EDE8F5').margin({ left: 10, right: 10 })
+        Text('68%').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#29253A')
+      }.width('100%').margin({ top: 12 })
+    }
+    .height(226)
+    .width('100%')
+    .padding(18)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor('#FFFFFFD9')
+    .border({ width: 1, color: '#FFFFFF' })
+    .borderRadius(22)
+    .backdropBlur(24)
+    .shadow({ radius: 24, color: '#8B7AFF18', offsetY: 10 })
+  }
+
+  @Builder
+  StatusLine(icon: string, label: string, value: string) {
+    Row() {
+      Text(icon).fontSize(20).fontColor('#8061F8').width(36).height(36).textAlign(TextAlign.Center).backgroundColor('#F0ECFF').borderRadius(12)
+      Column() {
+        Text(label).fontSize(10).fontColor('#A7A0B3')
+        Text(value).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#28243A').margin({ top: 3 })
+      }.alignItems(HorizontalAlign.Start).margin({ left: 10 })
+    }.margin({ bottom: 14 })
+  }
+
+  @Builder
+  DailyCareCard() {
+    Stack() {
+      Column() {
+        Text('每日关怀').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#232037')
+        Text(`“${this.care}”`).fontSize(13).fontColor('#746D82').lineHeight(21).margin({ top: 18 }).maxLines(3)
+        Text('去放松一下  ›').fontSize(13).fontColor('#7655F6').margin({ top: 16 }).onClick(() => this.openFeature('pages/Chat', '倾诉'))
+      }.width('100%').height('100%').padding(18).alignItems(HorizontalAlign.Start)
+      Ellipse().width(70).height(120).fill('#A9D69B').rotate({ angle: 28 }).opacity(0.92).position({ x: '61%', y: 118 })
+      Rect().width(56).height(44).fill('#F6EFD6').borderRadius(10).position({ x: '75%', y: 152 })
+      Rect().width(58).height(22).fill('#FFFFFF').borderRadius(11).position({ x: '57%', y: 178 })
+    }
+    .height(226)
+    .width('100%')
+    .backgroundColor('#FFFFFFC9')
+    .border({ width: 1, color: '#FFFFFF' })
+    .borderRadius(22)
+    .backdropBlur(24)
+    .clip(true)
+    .shadow({ radius: 24, color: '#8B7AFF16', offsetY: 10 })
+  }
+
+  @Builder
+  RecommendCards() {
+    Column() {
+      Row() {
+        Text('为你推荐').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#242138')
+        Blank()
+        Text('换一换  ↻').fontSize(12).fontColor('#7B7489').onClick(() => this.refreshCurrentState())
+      }.width('100%').margin({ bottom: 12 })
+      GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
+        if (this.recommendations.length > 0) {
+          ForEach(this.recommendations.slice(0, 4), (item: Recommendation, index: number) => {
+            GridCol({ span: { xs: 3, sm: 3, md: 3, lg: 3 } }) {
+              this.MediaCard(item.title, `${Math.max(8, (index + 1) * 4)} 分钟`, this.recColor(index))
+            }
+          }, (item: Recommendation) => item.title)
+        } else {
+          GridCol({ span: { xs: 3, sm: 3, md: 3, lg: 3 } }) { this.MediaCard('晨间放松', '8 分钟', '#BFE4BF') }
+          GridCol({ span: { xs: 3, sm: 3, md: 3, lg: 3 } }) { this.MediaCard('海边冥想', '12 分钟', '#F0B7A5') }
+          GridCol({ span: { xs: 3, sm: 3, md: 3, lg: 3 } }) { this.MediaCard('情绪日记', '15 分钟', '#D8BCA8') }
+          GridCol({ span: { xs: 3, sm: 3, md: 3, lg: 3 } }) { this.MediaCard('助眠音乐', '20 分钟', '#5E72B8') }
+        }
+      }.width('100%')
+    }.width('100%').margin({ top: 22 })
+  }
+
+  @Builder
+  MediaCard(title: string, time: string, color: string) {
+    Column() {
+      Stack() {
+        Rect().width('100%').height(80).fill(color).opacity(0.72)
+        Circle().width(30).height(30).fill('#FFFFFFD9')
+        Text('▶').fontSize(13).fontColor('#6B6178')
+      }.width('100%').height(80).borderRadius({ topLeft: 16, topRight: 16 }).clip(true)
+      Text(title).fontSize(13).fontWeight(FontWeight.Bold).fontColor('#2B273B').maxLines(1).margin({ top: 10 })
+      Text(time).fontSize(11).fontColor('#9B93A7').margin({ top: 4 })
+    }
+    .height(152)
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor('#FFFFFFC9')
+    .borderRadius(16)
+    .clip(true)
+    .shadow({ radius: 16, color: '#7564BB14', offsetY: 8 })
+    .onClick(() => this.openFeature('pages/RecommendationPage', '发现'))
+  }
+
+  @Builder
+  FeaturePage(title: string, sub: string, btn: string, url: string, featureName: string) {
+    Column() {
+      Stack() {
+        Circle().width(130).height(130).fill('#BDA7FF').opacity(0.82).blur(4)
+        Circle().width(82).height(82).fill('#FFFFFFD9').shadow({ radius: 18, color: '#9D84FF44', offsetY: 8 })
+        Text('⌣').fontSize(28).fontColor('#332D52')
+      }.width(160).height(150).sharedTransition(featureName === '倾诉' ? 'chat-entrance' : 'feature-card')
+      Text(title).fontSize(36).fontWeight(FontWeight.Bold).fontColor('#19172C').margin({ top: 16 })
+      Text(sub).fontSize(15).fontColor('#80788F').textAlign(TextAlign.Center).margin({ top: 10 })
+      Button(btn).height(50).fontSize(16).fontWeight(FontWeight.Bold).fontColor('#FFFFFF').backgroundColor('#7655F6').borderRadius(25).margin({ top: 28 })
+        .onClick(() => this.openFeature(url, featureName))
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center).padding(32)
+  }
+
+  @Builder
+  ProfilePage() {
+    Scroll() {
+      Column() {
+        this.ProfileOrb()
+        Text(this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '校园同学'))
+          .fontSize(30)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#19172C')
+          .margin({ top: 14 })
+        Text(this.isGuest ? '未登录' : (this.isAnonymous ? '匿名体验账号' : '正式校园账号'))
+          .fontSize(13)
+          .fontColor('#7655F6')
+          .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+          .backgroundColor('#EFE9FF')
+          .borderRadius(16)
+          .margin({ top: 8 })
+        this.ProfileInfoCard()
+        this.ProfileStatsGrid()
+        this.ProfilePrivacyCard()
+        Row() {
+          Button('画像趋势')
+            .layoutWeight(1)
+            .height(46)
+            .fontColor('#7655F6')
+            .backgroundColor('#FFFFFFD9')
+            .borderRadius(23)
+            .onClick(() => this.openFeature('pages/ProfileTimeline', '画像趋势'))
+          Button(this.isGuest ? '去登录' : '退出登录')
+            .layoutWeight(1)
+            .height(46)
+            .fontColor('#FFFFFF')
+            .backgroundColor(this.isGuest ? '#7655F6' : '#D9534F')
+            .borderRadius(23)
+            .margin({ left: 12 })
+            .onClick(() => {
+              if (this.isGuest) {
+                try {
+                  router.pushUrl({ url: 'pages/LoginPage' });
+                } catch (err) {
+                  console.error('pushUrl failed', err);
+                }
+              } else {
+                this.doLogout();
+              }
+            })
+        }
+        .width('100%')
+        .margin({ top: 18, bottom: 110 })
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 760 })
+      .padding({ left: 22, right: 22, top: 42 })
+      .alignItems(HorizontalAlign.Center)
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  ProfileInfoCard() {
+    Column() {
+      Row() {
+        Text('基本信息').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#242138')
+        Blank()
+        Text(this.profileOverviewReady ? '已同步' : '待同步').fontSize(12).fontColor('#7B7489')
+      }.width('100%').margin({ bottom: 14 })
+      this.InfoRow('账号 ID', this.currentUser?.id || '暂无')
+      this.InfoRow('昵称', this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '未设置'))
+      this.InfoRow('校园', this.currentUser?.campus || '未填写')
+      this.InfoRow('入学年份', this.currentUser?.enrollment_year ? `${this.currentUser?.enrollment_year}` : '未填写')
+      this.InfoRow('账号状态', this.currentUser?.account_status || (this.isGuest ? 'guest' : 'active'))
+      this.InfoRow('风险等级', this.riskLevel)
+    }
+    .width('100%')
+    .padding(18)
+    .margin({ top: 18 })
+    .backgroundColor('#FFFFFFD9')
+    .border({ width: 1, color: '#FFFFFF' })
+    .borderRadius(24)
+    .backdropBlur(24)
+    .shadow({ radius: 24, color: '#8B7AFF18', offsetY: 10 })
+  }
+
+  @Builder
+  InfoRow(label: string, value: string) {
+    Row() {
+      Text(label).fontSize(13).fontColor('#8F879A')
+      Blank()
+      Text(value).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#29253A').maxLines(1)
+    }.width('100%').padding({ top: 8, bottom: 8 })
+  }
+
+  @Builder
+  ProfileStatsGrid() {
+    GridRow({ columns: 12, gutter: { x: 12, y: 12 } }) {
+      GridCol({ span: { xs: 6, sm: 3, md: 3, lg: 3 } }) { this.ProfileStatCard('互动', `${this.currentUser?.total_interactions || 0}`, '#7655F6') }
+      GridCol({ span: { xs: 6, sm: 3, md: 3, lg: 3 } }) { this.ProfileStatCard('情绪', this.emotion, '#FF7DB7') }
+      GridCol({ span: { xs: 6, sm: 3, md: 3, lg: 3 } }) { this.ProfileStatCard('强度', `${Math.round(this.emotionIntensity * 100)}分`, '#31C96A') }
+      GridCol({ span: { xs: 6, sm: 3, md: 3, lg: 3 } }) { this.ProfileStatCard('搭子', this.profileSignalsText, '#E18B71') }
     }.width('100%').margin({ top: 14 })
   }
 
   @Builder
-  Me() {
+  ProfileStatCard(label: string, value: string, color: string) {
     Column() {
-      Text('我的').fontSize(18).fontWeight(FontWeight.Bold)
-      Button('退出登录').margin({ top: 20 }).onClick(() => this.doLogout())
-    }.width('100%').padding(20)
+      Circle().width(10).height(10).fill(color)
+      Text(value).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#242138').maxLines(1).margin({ top: 10 })
+      Text(label).fontSize(12).fontColor('#8F879A').margin({ top: 5 })
+    }
+    .height(108)
+    .width('100%')
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor('#FFFFFFD9')
+    .borderRadius(20)
+    .shadow({ radius: 18, color: `${color}18`, offsetY: 8 })
   }
 
   @Builder
-  Page(title: string, sub: string, btn: string, url: string, featureName: string) {
+  ProfilePrivacyCard() {
     Column() {
-      Text(title).fontSize(22).fontWeight(FontWeight.Bold)
-      Text(sub).fontSize(13).fontColor('#8B849B').margin({ top: 8 })
-      Button(btn).margin({ top: 20 }).onClick(() => this.openFeature(url, featureName))
-    }.width('100%').padding(20)
+      Row() {
+        Text('画像与隐私').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#242138')
+        Blank()
+        Text('OpenHarmony 多设备协同').fontSize(11).fontColor('#7655F6')
+      }.width('100%')
+      Text(this.profileOverviewText)
+        .fontSize(13)
+        .fontColor('#746D82')
+        .lineHeight(21)
+        .margin({ top: 12 })
+        .width('100%')
+      Text(this.profileSignalsText)
+        .fontSize(13)
+        .fontColor('#746D82')
+        .margin({ top: 8 })
+        .width('100%')
+    }
+    .width('100%')
+    .padding(18)
+    .margin({ top: 14 })
+    .backgroundColor('#FFFFFFCC')
+    .borderRadius(24)
+    .backdropBlur(24)
   }
 
   @Builder
-  EntryCard(title: string, desc: string, color: string, url: string, featureName: string) {
+  ProfileOrb() {
+    Stack() {
+      Circle().width(150).height(150).fill('#E4DCFF').backdropBlur(24)
+      Circle().width(this.glowPhase === 0 ? 88 : 104).height(this.glowPhase === 0 ? 88 : 104).fill('#8B6CFF').opacity(0.72).blur(5)
+      Text(this.emotion).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+    }.width(170).height(170).sharedTransition('emotion-orb')
+  }
+
+  @Builder
+  Tab(t: string, icon: Resource, n: number) {
     Column() {
-      Text(title).fontSize(14).fontWeight(FontWeight.Bold)
-      Text(desc).fontSize(11).fontColor('#8C8597').margin({ top: 6 })
-      Button('打开')
-        .fontSize(10)
-        .height(28)
-        .margin({ top: 10 })
-        .backgroundColor(color)
-        .fontColor('#FFF')
-        .borderRadius(14)
-        .onClick(() => this.openFeature(url, featureName))
-    }.padding(12).backgroundColor('#FFF').borderRadius(14)
+      Image(icon).width(24).height(24).fillColor(this.tab === n ? '#7655F6' : '#9994A6')
+      Text(t).fontSize(10).fontColor(this.tab === n ? '#7655F6' : '#9994A6').fontWeight(this.tab === n ? FontWeight.Bold : FontWeight.Regular).margin({ top: 4 })
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  CenterTab() {
+    Column() {
+      Stack() {
+        Circle().width(62).height(62).fill('#7655F6').shadow({ radius: 24, color: '#7655F666', offsetY: 8 })
+        Circle().width(this.glowPhase === 0 ? 38 : 48).height(this.glowPhase === 0 ? 38 : 48).fill('#9B82FF').opacity(0.7)
+        Image($r('app.media.voice')).width(27).height(27).fillColor('#FFFFFF')
+      }.sharedTransition('chat-entrance')
+      Text('倾诉').fontSize(10).fontColor('#7655F6').fontWeight(FontWeight.Bold).margin({ top: 2 })
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }
 
   recColor(index: number): string {
-    const colors = ['#7B57FF', '#6DAA90', '#E18B71', '#5F7DDB'];
+    const colors = ['#BFE4BF', '#F0B7A5', '#D8BCA8', '#5E72B8'];
     return colors[index % colors.length];
   }
 }

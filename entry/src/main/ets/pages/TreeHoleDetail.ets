@@ -21,8 +21,13 @@ struct TreeHoleDetail {
     interface LetterParams {
       letterId?: string;
     }
-    const params = router.getParams() as LetterParams;
-    this.letterId = params?.letterId || '';
+    try {
+      const params = router.getParams() as LetterParams;
+      this.letterId = params?.letterId || '';
+    } catch (err) {
+      console.error('getParams failed', err);
+      this.letterId = '';
+    }
     this.load();
   }
 
@@ -56,28 +61,52 @@ struct TreeHoleDetail {
 
   async save() {
     if (!this.content.trim()) {
-      promptAction.showToast({ message: '请输入内容' });
+      try {
+        promptAction.showToast({ message: '请输入内容' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
       return;
     }
     try {
       await apiService.updateLetter(this.letterId, this.content.trim(), this.title || undefined, this.allowAiAnalysis, this.writeToProfile);
-      promptAction.showToast({ message: '树洞已保存' });
+      try {
+        promptAction.showToast({ message: '树洞已保存' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
       await this.load();
       this.isEditing = false;
     } catch (error) {
       console.error('Save letter failed:', error);
-      promptAction.showToast({ message: '保存失败' });
+      try {
+        promptAction.showToast({ message: '保存失败' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     }
   }
 
   async remove() {
     try {
       await apiService.deleteLetter(this.letterId);
-      promptAction.showToast({ message: '树洞已删除' });
-      router.back();
+      try {
+        promptAction.showToast({ message: '树洞已删除' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
+      try {
+        router.back();
+      } catch (err) {
+        console.error('back failed', err);
+      }
     } catch (error) {
       console.error('Delete letter failed:', error);
-      promptAction.showToast({ message: '删除失败' });
+      try {
+        promptAction.showToast({ message: '删除失败' });
+      } catch (err) {
+        console.error('showToast failed', err);
+      }
     }
   }
 
@@ -86,7 +115,13 @@ struct TreeHoleDetail {
       Row() {
         Text('树洞详情').fontSize(20).fontWeight(FontWeight.Bold)
         Blank()
-        Button('返回').onClick(() => router.back())
+        Button('返回').onClick(() => {
+          try {
+            router.back();
+          } catch (err) {
+            console.error('back failed', err);
+          }
+        })
       }.width('100%').padding(16)
 
       if (this.isLoading) {

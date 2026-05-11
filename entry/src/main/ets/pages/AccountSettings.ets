@@ -3,7 +3,7 @@ import promptAction from '@ohos.promptAction';
 import { apiService } from '../services/ApiService';
 import { AnonymousProfile, UserPrivacySettings } from '../models/Types';
 
-const DEFAULT_API_BASE_URL = 'http://172.26.48.1:8080';
+const DEFAULT_API_BASE_URL = 'http://10.16.106.237:8080';
 
 @Entry
 @Component

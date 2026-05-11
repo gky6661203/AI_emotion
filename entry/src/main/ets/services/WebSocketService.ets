@@ -20,7 +20,7 @@ export class WebSocketService {
     }
 
     this.ws = webSocket.createWebSocket();
-    let wsUrl = `ws://localhost:8080/ws/devices/sync`;
+    let wsUrl = `ws://10.16.106.237:8080/ws/devices/sync`;
 
     this.ws.on('open', (err, value) => {
       if (err) {

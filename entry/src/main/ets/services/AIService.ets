@@ -11,7 +11,7 @@ export interface AIEmotionResult {
 export class AIService {
   async analyzeEmotion(text: string): Promise<AIEmotionResult> {
     try {
-      let response = await fetch('http://localhost:8090/v1/analyze/emotion', {
+      let response = await fetch('http://10.16.106.237:8090/v1/analyze/emotion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
