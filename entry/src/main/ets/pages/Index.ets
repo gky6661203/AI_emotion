@@ -1,10 +1,32 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import mediaquery from '@ohos.mediaquery';
 import { apiService } from '../services/ApiService';
-import { User, Recommendation, EmotionReport, ProfileStateVector } from '../models/Types';
+import { User, Recommendation, EmotionReport, ProfileStateVector, PrivateLetter, PublicPost } from '../models/Types';
 
+// Import types from ApiService (defined as interfaces there)
 interface EmotionReportResult extends EmotionReport {
   risk_level?: string;
+}
+interface PreferenceSignals {
+  prefersVoice: boolean;
+  prefersPrivateWriting: boolean;
+  prefersDirectAdvice: boolean;
+  openToPublicInteraction: boolean;
+}
+interface ProfileOverviewResponse {
+  signal_summary: string;
+  state_vector: ProfileStateVector;
+  preference_signals: PreferenceSignals;
+}
+interface GetRecommendationsResponse {
+  recommendations: Recommendation[];
+}
+interface LettersResponse {
+  letters: PrivateLetter[];
+}
+interface PostsResponse {
+  posts: PublicPost[];
 }
 
 interface FeatureEntry {
@@ -62,18 +84,46 @@ struct Index {
   @State selectedOrb: number = 0;
   @State cardLift: boolean = false;
   @State glowPhase: number = 0;
+  @State isWatchLayout: boolean = false;
+  private watchQuery: mediaquery.MediaQueryListener | null = null;
   @State featureEntries: FeatureEntry[] = [
     { title: '无压力倾诉', desc: '安心表达', icon: '♥', tint: '#FF7DB7', url: 'pages/Chat', featureName: '倾诉' },
     { title: 'AI共情陪伴', desc: '温暖回应', icon: '✦', tint: '#6F62FF', url: 'pages/Chat', featureName: '倾诉' },
     { title: '隐私安全', desc: '严格保护', icon: '▣', tint: '#31C96A', url: 'pages/SafetyHelp', featureName: '安全帮助' }
   ];
+  @State lastNavTime: number = 0;
   @State recentActions: FutureAction[] = [
     { title: '去树洞记录', desc: '把刚刚的情绪放进安全空间', url: 'pages/TreeHole' },
     { title: '查看搭子匹配', desc: '看看当前画像适合怎样的搭子', url: 'pages/MatchPage' },
     { title: '打开安全帮助', desc: '当需要稳住当下时先来这里', url: 'pages/SafetyHelp' }
   ];
+  // TreeHole Tab state
+  @State treeHoleLetters: PrivateLetter[] = [];
+  @State treeHoleShowWrite: boolean = false;
+  @State treeHoleTitle: string = '';
+  @State treeHoleContent: string = '';
+  @State treeHoleLoading: boolean = false;
+  // Plaza Tab state
+  @State plazaPosts: PublicPost[] = [];
+  @State plazaShowWrite: boolean = false;
+  @State plazaTitle: string = '';
+  @State plazaContent: string = '';
+  @State plazaLoading: boolean = false;
+
+  // Emotion maps as class-level constants
+  private static readonly EMOTION_EMOJI_MAP: Record<string, string> = {
+    'happy': '😊', 'sad': '😢', 'angry': '😠',
+    'anxious': '😰', 'lonely': '😔', 'neutral': '😐',
+    'joy': '😊', 'fear': '😰', 'love': '❤️'
+  };
+  private static readonly EMOTION_COLOR_MAP: Record<string, string> = {
+    'happy': '#4CAF50', 'sad': '#2196F3', 'angry': '#F44336',
+    'anxious': '#FF9800', 'lonely': '#9C27B0', 'neutral': '#9E9E9E',
+    'joy': '#4CAF50', 'fear': '#FF5722', 'love': '#E91E63'
+  };
 
   aboutToAppear() {
+    this.setupWatchQuery();
     this.load();
     try {
       animateTo({ duration: 1500, curve: Curve.EaseInOut, iterations: -1, playMode: PlayMode.Alternate }, () => {
@@ -85,14 +135,42 @@ struct Index {
     }
   }
 
+  aboutToDisappear() {
+    if (this.watchQuery) {
+      this.watchQuery.off('change');
+      this.watchQuery = null;
+    }
+  }
+
+  private setupWatchQuery(): void {
+    try {
+      this.watchQuery = mediaquery.matchMediaSync('(max-width: 240vp)');
+      this.isWatchLayout = this.watchQuery.matches;
+      this.watchQuery.on('change', (result: mediaquery.MediaQueryResult) => {
+        this.isWatchLayout = result.matches;
+      });
+    } catch (err) {
+      console.error('setup watch media query failed', err);
+      this.isWatchLayout = false;
+    }
+  }
+
   async load() {
     try {
       let me = await apiService.getMe();
       this.currentUser = me.user;
       this.isAnonymous = me.user.is_anonymous || me.user.role === 'anonymous';
       this.isGuest = false;
-      try {
-        let today = await apiService.getTodayEmotion();
+
+      // Parallel API calls for independent data
+      const result0 = await apiService.getTodayEmotion().catch((e: Error) => { console.error('load emotion failed', e); return null; }) as EmotionReportResult | null;
+      const result1 = await apiService.getProfileOverview().catch((e: Error) => { console.error('load profile overview failed', e); return null; }) as ProfileOverviewResponse | null;
+      const result2 = await apiService.getRecommendations(4).catch((e: Error) => { console.error('load recommendations failed', e); return null; }) as GetRecommendationsResponse | null;
+      const result3 = await apiService.listLetters().catch((e: Error) => { console.error('load treeHole letters failed', e); return null; }) as LettersResponse | null;
+      const result4 = await apiService.listPosts(30).catch((e: Error) => { console.error('load plaza posts failed', e); return null; }) as PostsResponse | null;
+
+      if (result0) {
+        const today = result0 as EmotionReportResult;
         let e = today.dominant_emotion || 'neutral';
         this.emotion = e === 'happy' || e === 'joy' ? '愉悦' :
           e === 'sad' ? '低落' : e === 'anxious' || e === 'fear' ? '焦虑' : e === 'angry' ? '烦躁' : '平静';
@@ -100,15 +178,14 @@ struct Index {
         this.emotionIntensity = today.average_intensity || 0;
         this.emotionTrendLabel = today.risk_events_count > 0 ? '最近需要更多照顾' :
           (today.total_records > 0 ? '近期状态有记录' : '暂无今日记录');
-        let maybeRisk = (today as EmotionReportResult).risk_level;
+        let maybeRisk = today.risk_level;
         if (maybeRisk) {
           this.riskLevel = maybeRisk;
         }
-      } catch (emotionErr) {
-        console.error('load emotion failed', emotionErr);
       }
-      try {
-        let profile = await apiService.getProfileOverview();
+
+      if (result1) {
+        const profile = result1 as ProfileOverviewResponse;
         this.profileOverviewReady = true;
         this.profileOverviewText = profile.signal_summary || '画像已更新';
         this.profileStateVector = {
@@ -125,14 +202,25 @@ struct Index {
         this.care = profile.preference_signals.prefersVoice ? '你更适合语音表达，先说出来会更轻松。' :
           profile.preference_signals.prefersPrivateWriting ? '你更适合先写下来，再慢慢整理。' :
             profile.preference_signals.prefersDirectAdvice ? '你最近更需要直接一点的建议。' : this.care;
-      } catch (profileErr) {
-        console.error('load profile overview failed', profileErr);
       }
-      try {
-        let rec = await apiService.getRecommendations(4);
-        this.recommendations = rec.recommendations || [];
-      } catch (recommendErr) {
-        console.error('load recommendations failed', recommendErr);
+
+      if (result2) {
+        const rec = result2 as GetRecommendationsResponse;
+        if (rec.recommendations) {
+          this.recommendations = rec.recommendations;
+        }
+      }
+      if (result3) {
+        const letters = result3 as LettersResponse;
+        if (letters.letters) {
+          this.treeHoleLetters = letters.letters;
+        }
+      }
+      if (result4) {
+        const posts = result4 as PostsResponse;
+        if (posts.posts) {
+          this.plazaPosts = posts.posts;
+        }
       }
     } catch (err) {
       this.currentUser = null;
@@ -179,6 +267,11 @@ struct Index {
     if (featureName && !this.requireAuth(featureName)) {
       return;
     }
+    let now = Date.now();
+    if (now - this.lastNavTime < 800) {
+      return;
+    }
+    this.lastNavTime = now;
     try {
       router.pushUrl({ url: url } as PushUrlOptions);
     } catch (err) {
@@ -227,12 +320,14 @@ struct Index {
       this.FluidBackground()
       if (this.isLoading) {
         this.LoadingView()
+      } else if (this.isWatchLayout) {
+        this.WatchOnlyHome()
       } else {
         Tabs({ barPosition: BarPosition.End }) {
           TabContent() { this.Home() }.tabBar(this.Tab('首页', $r('app.media.home'), 0))
-          TabContent() { this.FeaturePage('树洞', '登录树洞，发现更多美好', '进入树洞', 'pages/TreeHole', '树洞') }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
-          TabContent() { this.FeaturePage('倾诉', '今天想说点什么吗？', '开始今日倾诉', 'pages/Chat', '倾诉') }.tabBar(this.CenterTab())
-          TabContent() { this.FeaturePage('广场', '匿名共鸣，连接真实的你', '进入广场', 'pages/Plaza', '广场') }.tabBar(this.Tab('广场', $r('app.media.community'), 3))
+          TabContent() { this.TreeHoleTab() }.tabBar(this.Tab('树洞', $r('app.media.message'), 1))
+          TabContent() { this.EmptyTab() }.tabBar(this.CenterTab())
+          TabContent() { this.PlazaTab() }.tabBar(this.Tab('广场', $r('app.media.community'), 3))
           TabContent() { this.ProfilePage() }.tabBar(this.Tab('我的', $r('app.media.profile'), 4))
         }
         .barHeight(82)
@@ -245,6 +340,9 @@ struct Index {
             });
           } catch (err) {
             console.error('animateTo failed', err);
+          }
+          if (i === 2) {
+            this.openFeature('pages/Chat', '倾诉');
           }
         })
       }
@@ -309,6 +407,140 @@ struct Index {
       .padding({ left: 22, right: 22, top: 10 })
       .alignItems(HorizontalAlign.Center)
     }.width('100%').height('100%').backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  WatchOnlyHome() {
+    Scroll() {
+      Column() {
+        Stack() {
+          Circle().width(122).height(122).fill('#FFFFFFC9').backdropBlur(22)
+          Circle().width(this.glowPhase === 0 ? 74 : 88).height(this.glowPhase === 0 ? 74 : 88).fill('#7655F6').opacity(0.78).blur(3)
+          Column() {
+            Text(this.emotion).fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+            Text(`${Math.round(this.emotionIntensity * 100)}`).fontSize(12).fontColor('#EFEAFF').margin({ top: 2 })
+          }
+        }
+        .width(138)
+        .height(126)
+        .sharedTransition('emotion-orb')
+        .onClick(() => this.openFeature('pages/EmotionReport', '发现'))
+
+        Text(this.currentUser?.nickname || '同学')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#19172C')
+          .maxLines(1)
+          .margin({ top: 2 })
+        Text(this.emotionSummary)
+          .fontSize(10)
+          .fontColor('#766E84')
+          .maxLines(2)
+          .lineHeight(14)
+          .textAlign(TextAlign.Center)
+          .width(146)
+          .margin({ top: 4 })
+
+        Button('倾诉')
+          .width(118)
+          .height(36)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+          .backgroundColor('#7655F6')
+          .borderRadius(18)
+          .margin({ top: 8 })
+          .sharedTransition('chat-entrance')
+          .onClick(() => this.openFeature('pages/Chat', '倾诉'))
+
+        Row() {
+          this.WatchQuickButton('树洞', 'pages/TreeHole', '树洞')
+          this.WatchQuickButton('广场', 'pages/Plaza', '广场')
+        }.margin({ top: 7 })
+
+        Row() {
+          this.WatchQuickButton('报告', 'pages/EmotionReport', '发现')
+          this.WatchQuickButton('我的', 'pages/ProfileTimeline', '画像')
+        }.margin({ top: 6, bottom: 18 })
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
+      .padding({ left: 18, right: 18, top: 18, bottom: 18 })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  WatchHome() {
+    Column() {
+      Stack() {
+        Circle().width(132).height(132).fill('#FFFFFFB8').backdropBlur(24)
+        Circle().width(this.glowPhase === 0 ? 82 : 96).height(this.glowPhase === 0 ? 82 : 96).fill('#8B6CFF').opacity(0.72).blur(4)
+        Text(this.emotion).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+      }
+      .width(150)
+      .height(138)
+      .sharedTransition('emotion-orb')
+      .onClick(() => this.openFeature('pages/EmotionReport', '发现'))
+
+      Text(this.currentUser?.nickname || (this.isAnonymous ? '匿名同学' : '校园同学'))
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#19172C')
+        .maxLines(1)
+        .margin({ top: 4 })
+      Text(this.emotionSummary)
+        .fontSize(11)
+        .fontColor('#7F788E')
+        .maxLines(2)
+        .textAlign(TextAlign.Center)
+        .lineHeight(16)
+        .margin({ top: 6 })
+
+      Button('倾诉')
+        .width(126)
+        .height(40)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFF')
+        .backgroundColor('#7655F6')
+        .borderRadius(20)
+        .margin({ top: 10 })
+        .sharedTransition('chat-entrance')
+        .onClick(() => this.openFeature('pages/Chat', '倾诉'))
+
+      Row() {
+        this.WatchQuickButton('树洞', 'pages/TreeHole', '树洞')
+        this.WatchQuickButton('广场', 'pages/Plaza', '广场')
+      }.margin({ top: 8 })
+
+      Text('上滑查看更多')
+        .fontSize(10)
+        .fontColor('#A29AAF')
+        .margin({ top: 8, bottom: 12 })
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, top: 20 })
+    .backgroundColor('#FFFFFF66')
+    .borderRadius(999)
+    .backdropBlur(18)
+  }
+
+  @Builder
+  WatchQuickButton(title: string, url: string, featureName: string) {
+    Text(title)
+      .fontSize(12)
+      .fontColor('#7655F6')
+      .fontWeight(FontWeight.Bold)
+      .width(58)
+      .height(30)
+      .textAlign(TextAlign.Center)
+      .backgroundColor('#FFFFFFD9')
+      .borderRadius(15)
+      .margin({ left: 4, right: 4 })
+      .onClick(() => this.openFeature(url, featureName))
   }
 
   @Builder
@@ -568,18 +800,8 @@ struct Index {
   }
 
   @Builder
-  FeaturePage(title: string, sub: string, btn: string, url: string, featureName: string) {
-    Column() {
-      Stack() {
-        Circle().width(130).height(130).fill('#BDA7FF').opacity(0.82).blur(4)
-        Circle().width(82).height(82).fill('#FFFFFFD9').shadow({ radius: 18, color: '#9D84FF44', offsetY: 8 })
-        Text('⌣').fontSize(28).fontColor('#332D52')
-      }.width(160).height(150).sharedTransition(featureName === '倾诉' ? 'chat-entrance' : 'feature-card')
-      Text(title).fontSize(36).fontWeight(FontWeight.Bold).fontColor('#19172C').margin({ top: 16 })
-      Text(sub).fontSize(15).fontColor('#80788F').textAlign(TextAlign.Center).margin({ top: 10 })
-      Button(btn).height(50).fontSize(16).fontWeight(FontWeight.Bold).fontColor('#FFFFFF').backgroundColor('#7655F6').borderRadius(25).margin({ top: 28 })
-        .onClick(() => this.openFeature(url, featureName))
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center).padding(32)
+  EmptyTab() {
+    Column().width('100%').height('100%')
   }
 
   @Builder
@@ -761,4 +983,242 @@ struct Index {
     const colors = ['#BFE4BF', '#F0B7A5', '#D8BCA8', '#5E72B8'];
     return colors[index % colors.length];
   }
+
+  getEmotionEmoji(emotion: string): string {
+    return Index.EMOTION_EMOJI_MAP[emotion] || '😐';
+  }
+
+  async publishTreeHoleLetter(): Promise<void> {
+    if (!this.treeHoleContent.trim()) {
+      try { promptAction.showToast({ message: '请输入内容' }); } catch {}
+      return;
+    }
+    this.treeHoleLoading = true;
+    try {
+      let result = await apiService.createLetter(this.treeHoleContent, this.treeHoleTitle || undefined, true, true);
+      this.treeHoleLetters.unshift(result.letter);
+      this.treeHoleContent = '';
+      this.treeHoleTitle = '';
+      this.treeHoleShowWrite = false;
+      try { promptAction.showToast({ message: '树洞已发布' }); } catch {}
+    } catch (err) {
+      try { promptAction.showToast({ message: '发布失败' }); } catch {}
+    } finally {
+      this.treeHoleLoading = false;
+    }
+  }
+
+  async reactPlazaPost(postId: string, type: string): Promise<void> {
+    try {
+      await apiService.addReaction(postId, type);
+      try { promptAction.showToast({ message: '已回应' }); } catch {}
+    } catch (err) {
+      console.error('react Plaza failed', err);
+    }
+  }
+
+  async publishPlazaPost(): Promise<void> {
+    if (!this.plazaContent.trim()) {
+      try { promptAction.showToast({ message: '请输入内容' }); } catch {}
+      return;
+    }
+    this.plazaLoading = true;
+    try {
+      let result = await apiService.createPost(this.plazaContent, this.plazaTitle || undefined, true);
+      this.plazaPosts.unshift(result.post);
+      this.plazaContent = '';
+      this.plazaTitle = '';
+      this.plazaShowWrite = false;
+      try { promptAction.showToast({ message: '帖子已发布' }); } catch {}
+    } catch (err) {
+      try { promptAction.showToast({ message: '发布失败' }); } catch {}
+    } finally {
+      this.plazaLoading = false;
+    }
+  }
+
+  @Builder
+  TreeHoleTab() {
+    Column() {
+      this.TreeHoleHeader()
+      this.TreeHoleContent()
+    }
+    .width('100%').height('100%').backgroundColor('#F7F3FF')
+  }
+
+  @Builder
+  TreeHoleHeader() {
+    Row() {
+      Text('私密树洞').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#201B34')
+      Blank()
+      Button('写')
+        .fontSize(14).fontWeight(FontWeight.Bold)
+        .backgroundColor('#7655F6').fontColor('#FFFFFF')
+        .width(44).height(32).borderRadius(16)
+        .onClick(() => { this.treeHoleShowWrite = !this.treeHoleShowWrite; })
+    }
+    .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 6 })
+  }
+
+  @Builder
+  TreeHoleContent() {
+    Scroll() {
+      Column() {
+        if (this.treeHoleShowWrite) {
+          this.TreeHoleWritePanel()
+        }
+        if (this.treeHoleLetters.length === 0) {
+          Column() {
+            Text('🌿').fontSize(48).margin({ top: 20 })
+            Text('还没有树洞').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#666666').margin({ top: 12 })
+            Text('写下此刻的心事吧').fontSize(13).fontColor('#999999').margin({ top: 6 })
+          }.width('100%').padding({ top: 40, bottom: 20 })
+        } else {
+          ForEach(this.treeHoleLetters.slice(0, 20), (letter: PrivateLetter) => {
+            this.TreeHoleLetterCard(letter)
+          }, (letter: PrivateLetter) => letter.id)
+        }
+      }
+      .width('100%').padding({ left: 16, right: 16, top: 8, bottom: 20 })
+    }
+    .width('100%').layoutWeight(1)
+  }
+
+  @Builder
+  TreeHoleWritePanel() {
+    Column() {
+      TextInput({ placeholder: '标题（可选）', text: this.treeHoleTitle })
+        .height(44).backgroundColor('#F5F2FF').borderRadius(14).fontSize(14)
+        .padding({ left: 14, right: 14 }).margin({ bottom: 10 })
+        .onChange((v: string) => { this.treeHoleTitle = v; })
+      TextArea({ placeholder: '写下此刻的心事...', text: this.treeHoleContent })
+        .height(120).backgroundColor('#F5F2FF').borderRadius(14).fontSize(14)
+        .padding(14).margin({ bottom: 10 })
+        .onChange((v: string) => { this.treeHoleContent = v; })
+      Button('发布').height(44).fontSize(15).fontColor('#FFFFFF')
+        .backgroundColor('#7655F6').borderRadius(22).width('100%')
+        .onClick(() => this.publishTreeHoleLetter())
+    }
+    .width('100%').padding(16).backgroundColor('#FFFFFFD9').borderRadius(20)
+    .backdropBlur(20).margin({ bottom: 12 })
+  }
+
+  @Builder
+  TreeHoleLetterCard(letter: PrivateLetter) {
+    Column() {
+      Row() {
+        Column() {
+          if (letter.title) {
+            Text(letter.title).fontSize(15).fontWeight(FontWeight.Medium).fontColor('#201B34').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          Text(letter.content).fontSize(13).fontColor('#5F586F').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: letter.title ? 4 : 0 })
+        }.layoutWeight(1)
+      }
+      Row() {
+        if (letter.emotion) {
+          Text(this.getEmotionEmoji(letter.emotion) + ' ' + letter.emotion).fontSize(11).fontColor('#7655F6')
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 }).backgroundColor('#EFE9FF').borderRadius(10)
+        }
+        Blank()
+        Text(letter.created_at ? letter.created_at.substring(0, 10) : '').fontSize(11).fontColor('#8B849B')
+      }
+      .margin({ top: 10 }).width('100%')
+    }
+    .width('100%').padding(14).backgroundColor('#FFFFFFD9').borderRadius(18)
+    .backdropBlur(18).margin({ bottom: 10 })
+  }
+
+  @Builder
+  PlazaTab() {
+    Column() {
+      this.PlazaHeader()
+      this.PlazaContent()
+    }
+    .width('100%').height('100%').backgroundColor('#F7F3FF')
+  }
+
+  @Builder
+  PlazaHeader() {
+    Row() {
+      Text('广场').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#201B34')
+      Blank()
+      Button('发')
+        .fontSize(14).fontWeight(FontWeight.Bold)
+        .backgroundColor('#7655F6').fontColor('#FFFFFF')
+        .width(44).height(32).borderRadius(16)
+        .onClick(() => { this.plazaShowWrite = !this.plazaShowWrite; })
+    }
+    .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 6 })
+  }
+
+  @Builder
+  PlazaContent() {
+    Scroll() {
+      Column() {
+        if (this.plazaShowWrite) {
+          this.PlazaWritePanel()
+        }
+        if (this.plazaPosts.length === 0) {
+          Column() {
+            Text('🏠').fontSize(48).margin({ top: 20 })
+            Text('还没有匿名帖子').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#666666').margin({ top: 12 })
+            Text('发第一条匿名表达吧').fontSize(13).fontColor('#999999').margin({ top: 6 })
+          }.width('100%').padding({ top: 40, bottom: 20 })
+        } else {
+          ForEach(this.plazaPosts.slice(0, 20), (post: PublicPost) => {
+            this.PlazaPostCard(post)
+          }, (post: PublicPost) => post.id)
+        }
+      }
+      .width('100%').padding({ left: 16, right: 16, top: 8, bottom: 20 })
+    }
+    .width('100%').layoutWeight(1)
+  }
+
+  @Builder
+  PlazaWritePanel() {
+    Column() {
+      TextInput({ placeholder: '标题（可选）', text: this.plazaTitle })
+        .height(44).backgroundColor('#F5F2FF').borderRadius(14).fontSize(14)
+        .padding({ left: 14, right: 14 }).margin({ bottom: 10 })
+        .onChange((v: string) => { this.plazaTitle = v; })
+      TextArea({ placeholder: '分享你的情绪或倾诉...', text: this.plazaContent })
+        .height(120).backgroundColor('#F5F2FF').borderRadius(14).fontSize(14)
+        .padding(14).margin({ bottom: 10 })
+        .onChange((v: string) => { this.plazaContent = v; })
+      Button('发布').height(44).fontSize(15).fontColor('#FFFFFF')
+        .backgroundColor('#7655F6').borderRadius(22).width('100%')
+        .onClick(() => this.publishPlazaPost())
+    }
+    .width('100%').padding(16).backgroundColor('#FFFFFFD9').borderRadius(20)
+    .backdropBlur(20).margin({ bottom: 12 })
+  }
+
+  @Builder
+  PlazaPostCard(post: PublicPost) {
+    Column() {
+      Row() {
+        Column() {
+          Text(post.author_display_name || '匿名同学').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#201B34')
+          Text(post.created_at ? post.created_at.substring(0, 10) : '').fontSize(11).fontColor('#8B849B').margin({ top: 2 })
+        }
+        Blank()
+      }
+      .width('100%').margin({ bottom: 8 })
+      if (post.title) {
+        Text(post.title).fontSize(15).fontWeight(FontWeight.Medium).fontColor('#201B34').margin({ bottom: 4 }).width('100%')
+      }
+      Text(post.content || '').fontSize(13).fontColor('#5F586F').lineHeight(19).width('100%')
+      Row() {
+        Text(post.allow_comments ? '可评论' : '评论关闭').fontSize(11).fontColor('#7B57FF')
+        Blank()
+        Text('抱抱').fontSize(12).fontColor('#7655F6').backgroundColor('#F0E9FF').padding({ left: 10, right: 10, top: 4, bottom: 4 }).borderRadius(12)
+          .onClick(() => this.reactPlazaPost(post.id, 'hug'))
+      }
+      .margin({ top: 10 }).width('100%')
+    }
+    .width('100%').padding(16).backgroundColor('#FFFFFFD9').borderRadius(20)
+    .backdropBlur(20).margin({ bottom: 12 })
+  }
+
 }

@@ -1,5 +1,6 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import mediaquery from '@ohos.mediaquery';
 import { PublicPost } from '../models/Types';
 import { apiService } from '../services/ApiService';
 
@@ -20,9 +21,32 @@ struct Plaza {
   @State showReportDialog: boolean = false;
   @State quickHint: string = '先发声，再回应，再看见被回应';
   @State localDraftPosts: PublicPost[] = [];
+  @State isWatchLayout: boolean = false;
+  private watchQuery: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear() {
+    this.setupWatchQuery();
     this.loadPosts();
+  }
+
+  aboutToDisappear() {
+    if (this.watchQuery) {
+      this.watchQuery.off('change');
+      this.watchQuery = null;
+    }
+  }
+
+  private setupWatchQuery(): void {
+    try {
+      this.watchQuery = mediaquery.matchMediaSync('(max-width: 240vp)');
+      this.isWatchLayout = this.watchQuery.matches;
+      this.watchQuery.on('change', (result: mediaquery.MediaQueryResult) => {
+        this.isWatchLayout = result.matches;
+      });
+    } catch (err) {
+      console.error('setup watch media query failed', err);
+      this.isWatchLayout = false;
+    }
   }
 
   private safeText(value?: string): string {
@@ -234,11 +258,14 @@ struct Plaza {
   }
 
   build() {
-    Stack() {
+    if (this.isWatchLayout) {
+      this.WatchPlazaPage()
+    } else {
+      Stack() {
       Column() {
         this.Header()
         this.SearchBar()
-        Text(this.quickHint).fontSize(11).fontColor('#7B57FF').padding({ left: 16, right: 16, bottom: 6 }).width('100%')
+        Text(this.quickHint).fontSize(10).fontColor('#7B57FF').maxLines(1).padding({ left: 14, right: 14, bottom: 6 }).width('100%')
         this.PostListArea()
       }
       .width('100%')
@@ -252,65 +279,171 @@ struct Plaza {
       if (this.showCreateDialog) {
         this.CreateDialog()
       }
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor('#F4F1FF')
+    }
+  }
+
+  @Builder
+  WatchPlazaPage() {
+    Column() {
+      Row() {
+        Text('广场').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#201B34')
+        Blank()
+        Button('发')
+          .width(38)
+          .height(30)
+          .fontSize(13)
+          .fontColor('#FFFFFF')
+          .backgroundColor('#7658F6')
+          .borderRadius(15)
+          .onClick(() => { this.showCreateDialog = true; })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 6 })
+
+      if (this.isLoading && this.posts.length === 0) {
+        LoadingProgress().width(34).height(34).margin({ top: 42 })
+      } else if (this.getFilteredPosts().length === 0) {
+        Column() {
+          Text('暂无帖子').fontSize(15).fontWeight(FontWeight.Bold).fontColor('#201B34')
+          Text('点“发”倾诉').fontSize(11).fontColor('#8B849B').margin({ top: 5 })
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else {
+        List({ space: 8 }) {
+          ForEach(this.getFilteredPosts().slice(0, 8), (post: PublicPost) => {
+            ListItem() {
+              this.WatchPostCard(post)
+            }
+          }, (item: PublicPost) => item.id)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .padding({ left: 12, right: 12, bottom: 8 })
+      }
+
+      if (this.showCreateDialog) {
+        this.WatchCreatePanel()
+      }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F4F1FF')
+    .backgroundColor('#FAF8FF')
+  }
+
+  @Builder
+  WatchPostCard(post: PublicPost) {
+    Column() {
+      Text(this.safeText(post.title) || '匿名同学')
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#201B34')
+        .maxLines(1)
+      Text(this.safeText(post.content) || '内容为空')
+        .fontSize(12)
+        .fontColor('#5F586F')
+        .lineHeight(17)
+        .maxLines(3)
+        .margin({ top: 4 })
+      Text(this.isLocalPost(post) ? '待同步' : this.safeDateText(post.created_at))
+        .fontSize(10)
+        .fontColor('#8B849B')
+        .margin({ top: 5 })
+    }
+    .width('100%')
+    .padding(10)
+    .backgroundColor('#FFFFFFD9')
+    .borderRadius(16)
+  }
+
+  @Builder
+  WatchCreatePanel() {
+    Column() {
+      TextInput({ placeholder: '标题', text: this.newTitle })
+        .height(34)
+        .fontSize(12)
+        .backgroundColor('#F5F2FF')
+        .borderRadius(17)
+        .padding({ left: 12, right: 12 })
+        .onChange((v: string) => this.newTitle = v)
+      TextArea({ placeholder: '想说什么', text: this.newContent })
+        .height(62)
+        .fontSize(12)
+        .backgroundColor('#F5F2FF')
+        .borderRadius(14)
+        .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+        .margin({ top: 6 })
+        .onChange((v: string) => this.newContent = v)
+      Row() {
+        Button('取消').height(30).fontSize(12).backgroundColor('#ECE7F8').fontColor('#7658F6').borderRadius(15).onClick(() => { this.showCreateDialog = false; })
+        Button('发布').height(30).fontSize(12).backgroundColor('#7658F6').fontColor('#FFFFFF').borderRadius(15).margin({ left: 8 }).onClick(() => this.publishPost())
+      }.margin({ top: 6 })
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, bottom: 10 })
+    .backgroundColor('#FFFFFF')
   }
 
   @Builder
   Header() {
     Row() {
       Image($r('app.media.avatar1'))
-        .width(36)
-        .height(36)
-        .borderRadius(18)
+        .width(30)
+        .height(30)
+        .borderRadius(15)
       Column() {
-        Text('匿名广场')
-          .fontSize(22)
+        Text('广场')
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.color_text_primary'))
         Text(this.statusText)
-          .fontSize(11)
+          .fontSize(10)
           .fontColor('#8B849B')
-          .margin({ top: 2 })
+          .maxLines(1)
+          .margin({ top: 1 })
       }
       .alignItems(HorizontalAlign.Start)
-      .margin({ left: 10 })
+      .margin({ left: 8 })
       Blank()
-      Button('发帖')
+      Button('发')
         .fontSize(14)
+        .fontWeight(FontWeight.Bold)
         .backgroundColor($r('app.color.color_primary'))
         .fontColor($r('app.color.color_white'))
-        .height(34)
-        .borderRadius(17)
+        .width(44)
+        .height(32)
+        .borderRadius(16)
         .onClick(() => { this.showCreateDialog = true; })
     }
     .width('100%')
-    .padding(16)
+    .padding({ left: 16, right: 16, top: 12, bottom: 8 })
     .backgroundColor($r('app.color.color_white'))
   }
 
   @Builder
   SearchBar() {
     Row() {
-      TextInput({ placeholder: '搜索匿名内容', text: this.searchText })
+      TextInput({ placeholder: '搜索', text: this.searchText })
         .layoutWeight(1)
-        .height(40)
-        .backgroundColor('#F5F5F5')
-        .borderRadius(20)
-        .padding({ left: 16, right: 16 })
-        .onChange((v: string) => { this.searchText = v; })
-      Button('刷新')
         .height(36)
+        .backgroundColor('#F5F5F5')
+        .borderRadius(18)
+        .padding({ left: 14, right: 14 })
         .fontSize(13)
+        .onChange((v: string) => { this.searchText = v; })
+      Button('↻')
+        .width(40)
+        .height(36)
+        .fontSize(14)
         .backgroundColor('#F0E9FF')
         .fontColor('#7B57FF')
         .borderRadius(18)
-        .margin({ left: 10 })
+        .margin({ left: 8 })
         .onClick(() => this.loadPosts())
     }
-    .padding({ left: 16, right: 16, bottom: 8 })
+    .padding({ left: 14, right: 14, bottom: 6 })
     .backgroundColor($r('app.color.color_white'))
   }
 

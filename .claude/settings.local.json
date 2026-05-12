@@ -32,7 +32,12 @@
       "Bash(npm start *)",
       "Bash(ipconfig)",
       "Read(//c/Users/32328/.docker/**)",
-      "Read(//etc/docker/**)"
+      "Read(//etc/docker/**)",
+      "Bash(./scripts/start-backend.ps1 -ResetData -Rebuild)",
+      "Bash(\"D:/develop tools/Harmony/DevEco Studio/tools/node/node.exe\" \"D:/develop tools/Harmony/DevEco Studio/tools/hvigor/bin/hvigorw.js\" clean --mode module -p product=default assembleHap --analyze=normal --parallel --incremental --daemon)",
+      "Bash(awk '/^struct Index/,/^}/{print NR\": \"$0}' Index.ets)",
+      "Bash(powershell -File ./scripts/start-backend.ps1 -ResetData -Rebuild)",
+      "Bash(powershell -Command \"cd entry; hvigor build --force 2>&1\")"
     ]
   }
 }

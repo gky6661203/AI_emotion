@@ -1,7 +1,9 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import mediaquery from '@ohos.mediaquery';
 import { ChatMessage } from '../models/Types';
 import { apiService } from '../services/ApiService';
+import { CommonTabBar } from '../components/CommonTabBar';
 
 interface EmotionDetails {
   risk_level?: string;
@@ -26,10 +28,33 @@ struct Chat {
   @State showSafetyHelp: boolean = false;
   @State safetyMessage: string = '如果你现在很难受，请优先联系现实中的可信任支持者。';
   @State isAssistantTyping: boolean = false;
+  @State isWatchLayout: boolean = false;
+  private watchQuery: mediaquery.MediaQueryListener | null = null;
   scroller: Scroller = new Scroller();
 
   aboutToAppear() {
+    this.setupWatchQuery();
     this.initAndLoadMessages();
+  }
+
+  aboutToDisappear() {
+    if (this.watchQuery) {
+      this.watchQuery.off('change');
+      this.watchQuery = null;
+    }
+  }
+
+  private setupWatchQuery(): void {
+    try {
+      this.watchQuery = mediaquery.matchMediaSync('(max-width: 240vp)');
+      this.isWatchLayout = this.watchQuery.matches;
+      this.watchQuery.on('change', (result: mediaquery.MediaQueryResult) => {
+        this.isWatchLayout = result.matches;
+      });
+    } catch (err) {
+      console.error('setup watch media query failed', err);
+      this.isWatchLayout = false;
+    }
   }
 
   async initAndLoadMessages() {
@@ -68,7 +93,10 @@ struct Chat {
   }
 
   build() {
-    Column() {
+    if (this.isWatchLayout) {
+      this.WatchChatPage()
+    } else {
+      Column() {
       // Header
       Row() {
         Image($r('app.media.arrow_right'))
@@ -194,13 +222,13 @@ struct Chat {
       // Input Area
       Column() {
         Row() {
-          TextInput({ placeholder: '输入消息...', text: this.inputText })
+          TextInput({ placeholder: '消息', text: this.inputText })
             .layoutWeight(1)
-            .height(46)
+            .height(42)
             .backgroundColor('#F5F2FF')
-            .borderRadius(23)
-            .padding({ left: 18, right: 18 })
-            .fontSize(15)
+            .borderRadius(21)
+            .padding({ left: 14, right: 14 })
+            .fontSize(14)
             .fontColor('#201B34')
             .placeholderColor('#9A93AA')
             .onChange((value: string) => {
@@ -210,33 +238,136 @@ struct Chat {
           Button() {
             if (this.isLoading) {
               LoadingProgress()
-                .width(22)
-                .height(22)
+                .width(20)
+                .height(20)
                 .color('#FFFFFF')
             } else {
-              Text('发送')
-                .fontSize(14)
+              Text('发')
+                .fontSize(15)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#FFFFFF')
             }
           }
-          .width(72)
-          .height(46)
+          .width(42)
+          .height(42)
           .backgroundColor(this.inputText.trim().length > 0 ? '#7658F6' : '#C9C2D8')
-          .borderRadius(23)
-          .margin({ left: 10 })
-          .shadow({ radius: this.inputText.trim().length > 0 ? 12 : 0, color: '#7658F644', offsetY: 4 })
+          .borderRadius(21)
+          .margin({ left: 8 })
+          .shadow({ radius: this.inputText.trim().length > 0 ? 10 : 0, color: '#7658F644', offsetY: 4 })
           .enabled(this.inputText.trim().length > 0 && !this.isLoading)
           .onClick(() => this.sendMessage())
         }
         .width('100%')
-        .padding({ left: 12, right: 12, top: 10, bottom: 12 })
+        .padding({ left: 10, right: 10, top: 8, bottom: 10 })
         .backgroundColor('#FFFFFF')
+        Blank()
+        CommonTabBar()
       }
       .width('100%')
     }
     .width('100%')
     .height('100%')
+  }
+}
+
+  @Builder
+  WatchChatPage() {
+    Column() {
+      Row() {
+        Text('‹').fontSize(24).fontColor('#201B34').onClick(() => {
+          try {
+            router.back();
+          } catch (err) {
+            console.error('back failed', err);
+          }
+        })
+        Text(this.emotionLabel).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#201B34').margin({ left: 8 })
+        Blank()
+        Circle().width(8).height(8).fill('#4CAF50')
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 10, bottom: 6 })
+
+      List({ scroller: this.scroller }) {
+        ForEach(this.messages.slice(-6), (msg: ChatMessage) => {
+          ListItem() {
+            if (msg.role === 'user') {
+              this.WatchUserMessage(msg.content)
+            } else {
+              this.WatchAIMessage(msg.content)
+            }
+          }
+        })
+        if (this.isAssistantTyping) {
+          ListItem() {
+            Text('AI 正在想...').fontSize(12).fontColor('#7B57FF').padding(10)
+          }
+        }
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 12, right: 12 })
+
+      Row() {
+        TextInput({ placeholder: '消息', text: this.inputText })
+          .layoutWeight(1)
+          .height(38)
+          .fontSize(13)
+          .backgroundColor('#F5F2FF')
+          .borderRadius(19)
+          .padding({ left: 12, right: 12 })
+          .onChange((value: string) => { this.inputText = value; })
+        Button('发')
+          .width(38)
+          .height(38)
+          .fontSize(13)
+          .fontColor('#FFFFFF')
+          .backgroundColor(this.inputText.trim().length > 0 ? '#7658F6' : '#C9C2D8')
+          .borderRadius(19)
+          .margin({ left: 6 })
+          .enabled(this.inputText.trim().length > 0 && !this.isLoading)
+          .onClick(() => this.sendMessage())
+      }
+      .width('100%')
+      .padding({ left: 10, right: 10, bottom: 10 })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#FAF8FF')
+  }
+
+  @Builder
+  WatchUserMessage(content: string) {
+    Row() {
+      Blank()
+      Text(content)
+        .fontSize(13)
+        .fontColor('#FFFFFF')
+        .lineHeight(18)
+        .padding({ left: 10, right: 10, top: 7, bottom: 7 })
+        .backgroundColor('#7658F6')
+        .borderRadius(14)
+        .constraintSize({ maxWidth: 128 })
+    }.width('100%').margin({ bottom: 6 })
+  }
+
+  @Builder
+  WatchAIMessage(content: string) {
+    Row() {
+      Text(this.compactMessage(content))
+        .fontSize(13)
+        .fontColor('#201B34')
+        .lineHeight(18)
+        .padding({ left: 10, right: 10, top: 7, bottom: 7 })
+        .backgroundColor('#FFFFFF')
+        .borderRadius(14)
+        .constraintSize({ maxWidth: 136 })
+    }.width('100%').margin({ bottom: 6 })
+  }
+
+  private compactMessage(content: string): string {
+    const value = (content || '').replace(/\n+/g, ' ');
+    return value.length > 80 ? `${value.substring(0, 80)}...` : value;
   }
 
   @Builder
